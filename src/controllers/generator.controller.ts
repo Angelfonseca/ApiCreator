@@ -4,7 +4,6 @@ import { Request, Response } from 'express';
 import fs from 'fs';
 import archiver from 'archiver';
 
-// Función para generar modelos
 const genModels = (modelos: any[], dir: string): void => {
     const outputDir = path.join(dir, 'models');
 
@@ -24,7 +23,6 @@ const genModels = (modelos: any[], dir: string): void => {
     }
 };
 
-// Función para generar servicios
 const genServices = (modelos: any[], dir: string): void => {
     const outputDir = path.join(dir, 'services');
 
@@ -37,10 +35,9 @@ const genServices = (modelos: any[], dir: string): void => {
         const fields = modelo.fields;
         const serviceContent = generatorService.genServices(name, fields);
 
-        // Agrega una validación para verificar que el contenido del servicio no sea undefined
         if (typeof serviceContent !== 'string') {
             console.error(`Error al generar el servicio para ${name}: el contenido es undefined.`);
-            continue; // Salta este modelo y continúa con el siguiente
+            continue; 
         }
 
         const filePath = path.join(outputDir, `${name}.service.ts`);
@@ -66,7 +63,7 @@ const genModelInterface = (modelos: any[], dir: string): void => {
     }
 }
 
-// Función para generar controladores
+
 const genControllers = (modelos: any[], dir: string): void => {
     const outputDir = path.join(dir, 'controllers');
 
@@ -90,7 +87,7 @@ const genPackageJson = (projectName: string): any => {
     return generatorService.genPackageJson(projectName);
 }
 
-// Función para generar rutas
+
 const genRoutes = (modelos: any[], dir: string): void => {
     const outputDir = path.join(dir, 'routes');
 
@@ -110,11 +107,11 @@ const genRoutes = (modelos: any[], dir: string): void => {
 };
 
 
-const genIndex = (modelos: any[], dir: string): void => {
+const genIndex = (modelos: any[], dir: string, projectName: string): void => {
     const outputDir = path.join(dir, 'index.ts');
 
     const names = modelos.map(modelo => modelo.name);
-    const indexContent = generatorService.genIndex(names);
+    const indexContent = generatorService.genIndex(names, projectName);
 
     fs.writeFileSync(outputDir, indexContent);
     console.log(`Index generado en ${outputDir}`);
@@ -123,7 +120,6 @@ const genIndex = (modelos: any[], dir: string): void => {
 const createProject = async (req: Request, res: Response): Promise<void> => {
     const { modelos, projectName } = req.body;
 
-    // Validar que los datos necesarios están presentes
     if (!modelos || !projectName) {
         res.status(400).send('Faltan datos');
         return;
@@ -132,7 +128,6 @@ const createProject = async (req: Request, res: Response): Promise<void> => {
     const outputBaseDir = path.join(__dirname, '..', '..', '..', 'outputs');
     console.log(`Output base directory: ${outputBaseDir}`);
 
-    // Crear directorio base si no existe
     if (!fs.existsSync(outputBaseDir)) {
         fs.mkdirSync(outputBaseDir, { recursive: true });
         console.log(`Directorio creado: ${outputBaseDir}`);
@@ -141,7 +136,6 @@ const createProject = async (req: Request, res: Response): Promise<void> => {
     const projectDir = path.join(outputBaseDir, projectName);
     console.log(`Project directory: ${projectDir}`);
 
-    // Crear directorio del proyecto si no existe
     if (!fs.existsSync(projectDir)) {
         fs.mkdirSync(projectDir);
         console.log(`Directorio del proyecto creado: ${projectDir}`);
@@ -150,20 +144,18 @@ const createProject = async (req: Request, res: Response): Promise<void> => {
     const srcDir = path.join(projectDir, 'src');
     console.log(`Source directory: ${srcDir}`);
 
-    // Crear directorio src si no existe
     if (!fs.existsSync(srcDir)) {
         fs.mkdirSync(srcDir);
         console.log(`Directorio src creado: ${srcDir}`);
     }
 
-    // Generación de archivos de proyecto
     try {
         genModels(modelos, srcDir);
         genServices(modelos, srcDir);
         genControllers(modelos, srcDir);
         genModelInterface(modelos, srcDir);
         genRoutes(modelos, srcDir);
-        genIndex(modelos, srcDir);
+        genIndex(modelos, srcDir, projectName);
 
         const packageJsonContent = genPackageJson(projectName);
         fs.writeFileSync(path.join(projectDir, 'package.json'), packageJsonContent);
@@ -173,13 +165,16 @@ const createProject = async (req: Request, res: Response): Promise<void> => {
         fs.writeFileSync(path.join(projectDir, 'start.bat'), bat);
         console.log(`start.bat creado en: ${projectDir}`);
 
-        // Crear el archivo ZIP
+        const tsconfig = generatorService.gentTsConfig();
+        fs.writeFileSync(path.join(projectDir, 'tsconfig.json'), tsconfig);
+        console.log(`tsconfig.json creado en: ${projectDir}`);
+
         const zipFilePath = path.join(outputBaseDir, `${projectName}.zip`);
         console.log(`Ruta del archivo ZIP: ${zipFilePath}`);
 
         const output = fs.createWriteStream(zipFilePath);
         const archive = archiver('zip', {
-            zlib: { level: 9 } // Nivel de compresión
+            zlib: { level: 9 } 
         });
 
         output.on('close', () => {
@@ -190,11 +185,9 @@ const createProject = async (req: Request, res: Response): Promise<void> => {
                     res.status(500).send('Error al descargar el archivo');
                     return;
                 }
-                // Eliminar el archivo ZIP después de la descarga
                 fs.unlinkSync(zipFilePath);
                 console.log(`Archivo ZIP eliminado: ${zipFilePath}`);
                 
-                // Eliminar el directorio del proyecto después de la descarga
                 fs.rmSync(projectDir, { recursive: true, force: true });
                 console.log(`Directorio del proyecto eliminado: ${projectDir}`);
             });
@@ -218,8 +211,8 @@ const createProject = async (req: Request, res: Response): Promise<void> => {
         });
 
         archive.pipe(output);
-        archive.directory(projectDir, false); // Agregar el directorio del proyecto al ZIP
-        await archive.finalize(); // <--- Await the finalize method
+        archive.directory(projectDir, false);
+        await archive.finalize();
 
     } catch (error) {
         console.error('Error durante la creación del proyecto:', error);

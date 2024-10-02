@@ -8,19 +8,18 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
-// Set the view engine to EJS
 app.set('view engine', 'ejs');
-// Update this line to point to the correct path
-app.set('views', path.join(__dirname, '../views')); // Go one level up to find the views folder
+
+app.set('views', path.join(__dirname, '../views')); 
 
 app.get('/', (req, res) => {
-  res.render('index'); // Render index.ejs
+  res.render('index');
 });
 
 app.use('/api', route);
 
-const PORT = process.env.PORT || 3000;
+const PORT = parseInt(process.env.PORT as string, 10) || 3000;
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server is running on port ${PORT}`);
 });
