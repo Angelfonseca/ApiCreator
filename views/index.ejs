@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>My Express App</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+        background-color: #f4f4f4;
+      }
+      h1,
+      h2,
+      h3,
+      h4,
+      h5,
+      h6 {
+        color: #333;
+      }
+      .container {
+        max-width: 800px;
+        margin: auto;
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      }
+      .form-group {
+        margin-bottom: 15px;
+      }
+      label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+      }
+      input[type="text"],
+      input[type="number"] {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+      }
+      select {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+      }
+      button {
+        background-color: #28a745;
+        color: white;
+        padding: 10px 15px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      button:hover {
+        background-color: #218838;
+      }
+      .field-group {
+        margin-top: 15px;
+        padding: 10px;
+        border: 1px solid #e0e0e0;
+        border-radius: 4px;
+        background-color: #f9f9f9;
+      }
+      .remove-button {
+        background-color: #dc3545;
+      }
+      .remove-button:hover {
+        background-color: #c82333;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Hello World!</h1>
+      <p>Welcome to my Express application with EJS.</p>
+
+      <h2>Project Configuration Form</h2>
+      <form id="projectForm">
+        <div class="form-group">
+          <label for="projectName">Project Name:</label>
+          <input type="text" id="projectName" name="projectName" required />
+        </div>
+
+        <div id="modelsContainer">
+          <h3>Models</h3>
+          <!-- Models will be dynamically added here -->
+        </div>
+
+        <button type="button" onclick="addModel()">Add Model</button>
+        <button type="submit">Submit</button>
+      </form>
+    </div>
+
+    <script>
+      let modelCount = 0;
+
+      function addModel() {
+        modelCount++;
+        const modelDiv = document.createElement("div");
+        modelDiv.className = "form-group";
+        modelDiv.id = `model-${modelCount}`;
+
+        modelDiv.innerHTML = `
+                <h4>Model ${modelCount}</h4>
+                <label for="modelName-${modelCount}">Model Name:</label>
+                <input type="text" id="modelName-${modelCount}" name="modelName-${modelCount}" required>
+                <div id="fieldsContainer-${modelCount}">
+                    <h5>Fields</h5>
+                </div>
+                <button type="button" onclick="addField(${modelCount})">Add Field</button>
+                <button type="button" onclick="removeModel(${modelCount})" class="remove-button">Remove Model</button>
+            `;
+
+        document.getElementById("modelsContainer").appendChild(modelDiv);
+      }
+
+      function addField(modelId) {
+        const fieldCount =
+          document.querySelectorAll(`#fieldsContainer-${modelId} .field-group`)
+            .length + 1;
+        const fieldDiv = document.createElement("div");
+        fieldDiv.className = "field-group";
+
+        fieldDiv.innerHTML = `
+                <h6>Field ${fieldCount}</h6>
+                <label for="fieldName-${modelId}-${fieldCount}">Field Name:</label>
+                <input type="text" id="fieldName-${modelId}-${fieldCount}" name="fieldName-${modelId}-${fieldCount}" required>
+                <label for="fieldType-${modelId}-${fieldCount}">Field Type:</label>
+                <select id="fieldType-${modelId}-${fieldCount}" name="fieldType-${modelId}-${fieldCount}" required>
+                    <option value="number">Number</option>
+                    <option value="string">String</option>
+                    <option value="array">Array</option>
+                </select>
+                <label for="fieldRequired-${modelId}-${fieldCount}">Required:</label>
+                <input type="checkbox" id="fieldRequired-${modelId}-${fieldCount}" name="fieldRequired-${modelId}-${fieldCount}"> <br>
+                <button type="button" onclick="removeField(this)" class="remove-button">Remove Field</button>
+            `;
+
+        document
+          .getElementById(`fieldsContainer-${modelId}`)
+          .appendChild(fieldDiv);
+      }
+
+      function removeField(button) {
+        const fieldGroup = button.parentNode;
+        fieldGroup.parentNode.removeChild(fieldGroup);
+      }
+
+      function removeModel(modelId) {
+        const modelDiv = document.getElementById(`model-${modelId}`);
+        modelDiv.parentNode.removeChild(modelDiv);
+      }
+
+      document
+        .getElementById("projectForm")
+        .addEventListener("submit", function (event) {
+          event.preventDefault();
+          const projectName = document.getElementById("projectName").value;
+          const models = [];
+
+          for (let i = 1; i <= modelCount; i++) {
+            const modelDiv = document.getElementById(`model-${i}`);
+            if (modelDiv) {
+              const modelName = document.getElementById(`modelName-${i}`).value;
+              const fields = [];
+              const fieldGroups = modelDiv.querySelectorAll(".field-group");
+
+              fieldGroups.forEach((fieldGroup) => {
+                const fieldName =
+                  fieldGroup.querySelector('input[type="text"]').value;
+                const fieldType = fieldGroup.querySelector("select").value;
+                const fieldRequired = fieldGroup.querySelector(
+                  'input[type="checkbox"]'
+                ).checked;
+
+                fields.push({
+                  name: fieldName,
+                  type: fieldType,
+                  required: fieldRequired,
+                });
+              });
+
+              models.push({
+                name: modelName,
+                fields: fields,
+              });
+            }
+          }
+
+          const formData = {
+            projectName: projectName,
+            modelos: models,
+          };
+
+          // Hacer la solicitud POST a la API
+          fetch("/api/generate", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(formData),
+          })
+            .then((response) => response.blob())
+            .then((blob) => {
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = `${projectName}.zip`;
+              a.click();
+              URL.revokeObjectURL(url);
+            })
+            .catch((error) => {
+              console.error("Error:", error);
+            });
+        });
+    </script>
+  </body>
+</html>
