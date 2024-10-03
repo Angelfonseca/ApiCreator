@@ -14,7 +14,7 @@ const genModels = (modelos: any[], dir: string): void => {
     for (const modelo of modelos) {
         const name = modelo.name;
         const fields = modelo.fields;
-        const modelContent = generatorService.genModel(name, fields);
+        const modelContent = generatorService.gentsModel(name, fields);
 
         const filePath = path.join(outputDir, `${name}.model.ts`);
 
@@ -33,7 +33,7 @@ const genServices = (modelos: any[], dir: string): void => {
     for (const modelo of modelos) {
         const name = modelo.name;
         const fields = modelo.fields;
-        const serviceContent = generatorService.genServices(name, fields);
+        const serviceContent = generatorService.gentsServices(name, fields);
 
         if (typeof serviceContent !== 'string') {
             console.error(`Error al generar el servicio para ${name}: el contenido es undefined.`);
@@ -54,7 +54,7 @@ const genModelInterface = (modelos: any[], dir: string): void => {
     for (const modelo of modelos) {
         const name = modelo.name;
         const fields = modelo.fields;
-        const interfaceContent = generatorService.genModelInterface(name, fields);
+        const interfaceContent = generatorService.gentsModelInterface(name, fields);
 
         const filePath = path.join(outputDir, `${name}.interface.ts`);
 
@@ -74,7 +74,7 @@ const genControllers = (modelos: any[], dir: string): void => {
     for (const modelo of modelos) {
         const name = modelo.name;
         const fields = modelo.fields;
-        const controllerContent = generatorService.genControllers(name, fields);
+        const controllerContent = generatorService.gentsControllers(name, fields);
 
         const filePath = path.join(outputDir, `${name}.controller.ts`);
 
@@ -97,7 +97,7 @@ const genRoutes = (modelos: any[], dir: string): void => {
 
     for (const modelo of modelos) {
         const name = modelo.name;
-        const routesContent = generatorService.genRoutes(name);
+        const routesContent = generatorService.gentsRoutes(name);
 
         const filePath = path.join(outputDir, `${name}.routes.ts`);
 
@@ -111,7 +111,7 @@ const genIndex = (modelos: any[], dir: string, projectName: string): void => {
     const outputDir = path.join(dir, 'index.ts');
 
     const names = modelos.map(modelo => modelo.name);
-    const indexContent = generatorService.genIndex(names, projectName);
+    const indexContent = generatorService.gentsIndex(names, projectName);
 
     fs.writeFileSync(outputDir, indexContent);
     console.log(`Index generado en ${outputDir}`);

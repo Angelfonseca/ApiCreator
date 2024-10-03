@@ -3,61 +3,79 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>My Express App</title>
+    <title>CRUD API TS Creator</title>
     <style>
       body {
         font-family: Arial, sans-serif;
-        margin: 20px;
+        margin: 0;
         background-color: #f4f4f4;
+        color: #333;
       }
+      .field-group {
+        margin-top: 15px;
+        padding: 15px; /* Aumenta el padding para dar más espacio */
+        border: 1px solid #e0e0e0;
+        border-radius: 4px;
+        background-color: #f9f9f9;
+      }
+
       h1,
       h2,
       h3,
       h4,
       h5,
       h6 {
-        color: #333;
+        margin: 0;
+        padding: 10px 0;
       }
+
       .container {
-        max-width: 800px;
-        margin: auto;
+        max-width: 600px;
+        margin: 20px auto;
         background: white;
         padding: 20px;
         border-radius: 8px;
         box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
       }
+
       .form-group {
-        margin-bottom: 15px;
+        margin-bottom: 20px;
       }
+
       label {
         display: block;
         margin-bottom: 5px;
         font-weight: bold;
       }
+
       input[type="text"],
-      input[type="number"] {
-        width: 100%;
-        padding: 10px;
-        border: 1px solid #ccc;
-        border-radius: 4px;
-      }
+      input[type="number"],
       select {
         width: 100%;
-        padding: 10px;
+        padding: 8px;
         border: 1px solid #ccc;
         border-radius: 4px;
+        font-size: 14px;
+        box-sizing: border-box;
       }
+
       button {
         background-color: #28a745;
         color: white;
-        padding: 10px 15px;
+        padding: 8px 12px;
         border: none;
         border-radius: 4px;
         cursor: pointer;
+        font-size: 14px;
+        margin-top: 10px;
+        transition: background-color 0.3s;
+        width: auto; /* Ajustar el ancho de los botones */
       }
+
       button:hover {
         background-color: #218838;
       }
+
       .field-group {
         margin-top: 15px;
         padding: 10px;
@@ -65,45 +83,54 @@
         border-radius: 4px;
         background-color: #f9f9f9;
       }
+
       .remove-button {
         background-color: #dc3545;
       }
+
       .remove-button:hover {
         background-color: #c82333;
       }
 
       /* Media Queries for Mobile */
       @media (max-width: 600px) {
-        body {
-          margin: 10px;
-        }
         .container {
-          padding: 10px;
+          padding: 15px;
         }
+
         button {
           width: 100%;
-          margin-top: 10px;
         }
+
         .form-group {
-          margin-bottom: 10px;
+          margin-bottom: 15px;
         }
+
         .field-group {
           margin-top: 10px;
-          padding: 5px;
+          padding: 8px;
         }
       }
     </style>
   </head>
   <body>
     <div class="container">
-      <h1>Hello World!</h1>
-      <p>Welcome to my Express application with EJS.</p>
+      <h1>JS and TS API CRUD Creator!</h1>
+      <p>Welcome to my API generator.</p>
 
       <h2>Project Configuration Form</h2>
       <form id="projectForm">
         <div class="form-group">
           <label for="projectName">Project Name:</label>
           <input type="text" id="projectName" name="projectName" required />
+        </div>
+
+        <div class="form-group">
+          <label for="projectType">Select Project Type:</label>
+          <select id="projectType" name="projectType" required>
+            <option value="javascript">JavaScript</option>
+            <option value="typescript">TypeScript</option>
+          </select>
         </div>
 
         <div id="modelsContainer">
@@ -115,26 +142,27 @@
         <button type="submit">Submit</button>
       </form>
     </div>
-
     <script>
       let modelCount = 0;
 
       function addModel() {
         modelCount++;
+
+        // Create a new div to wrap the model
         const modelDiv = document.createElement("div");
-        modelDiv.className = "form-group";
+        modelDiv.className = "field-group"; // Use the same class as for field groups
         modelDiv.id = `model-${modelCount}`;
 
         modelDiv.innerHTML = `
-                <h4>Model ${modelCount}</h4>
-                <label for="modelName-${modelCount}">Model Name:</label>
-                <input type="text" id="modelName-${modelCount}" name="modelName-${modelCount}" required>
-                <div id="fieldsContainer-${modelCount}">
-                    <h5>Fields</h5>
-                </div>
-                <button type="button" onclick="addField(${modelCount})">Add Field</button>
-                <button type="button" onclick="removeModel(${modelCount})" class="remove-button">Remove Model</button>
-            `;
+      <h4>Model ${modelCount}</h4>
+      <label for="modelName-${modelCount}">Model Name:</label>
+      <input type="text" id="modelName-${modelCount}" name="modelName-${modelCount}" required>
+      <div id="fieldsContainer-${modelCount}">
+        <h5>Fields</h5>
+      </div>
+      <button type="button" onclick="addField(${modelCount})">Add Field</button>
+      <button type="button" onclick="removeModel(${modelCount})" class="remove-button">Remove Model</button>
+    `;
 
         document.getElementById("modelsContainer").appendChild(modelDiv);
       }
@@ -147,22 +175,28 @@
         fieldDiv.className = "field-group";
 
         fieldDiv.innerHTML = `
-                <h6>Field ${fieldCount}</h6>
-                <label for="fieldName-${modelId}-${fieldCount}">Field Name:</label>
-                <input type="text" id="fieldName-${modelId}-${fieldCount}" name="fieldName-${modelId}-${fieldCount}" required>
-                <label for="fieldType-${modelId}-${fieldCount}">Field Type:</label>
-                <select id="fieldType-${modelId}-${fieldCount}" name="fieldType-${modelId}-${fieldCount}" required>
-                    <option value="number">Number</option>
-                    <option value="string">String</option>
-                    <option value="array">Array</option>
-                    <option value="object">Object</option>
-                    <option value="boolean">Boolean</option>
-                    <option value="date">Date</option>
-                </select>
-                <label for="fieldRequired-${modelId}-${fieldCount}">Required:</label>
-                <input type="checkbox" id="fieldRequired-${modelId}-${fieldCount}" name="fieldRequired-${modelId}-${fieldCount}"> <br>
-                <button type="button" onclick="removeField(this)" class="remove-button">Remove Field</button>
-            `;
+      <h6>Field ${fieldCount}</h6>
+      <label for="fieldName-${modelId}-${fieldCount}">Field Name:</label>
+      <input type="text" id="fieldName-${modelId}-${fieldCount}" name="fieldName-${modelId}-${fieldCount}" required>
+      
+      <label for="fieldType-${modelId}-${fieldCount}">Field Type:</label>
+      <select id="fieldType-${modelId}-${fieldCount}" name="fieldType-${modelId}-${fieldCount}" required>
+        <option value="number">Number</option>
+        <option value="string">String</option>
+        <option value="array">Array</option>
+        <option value="object">Object</option>
+        <option value="boolean">Boolean</option>
+        <option value="date">Date</option>
+      </select>
+      
+      <label for="fieldRef-${modelId}-${fieldCount}">Field Reference (optional):</label>
+      <input type="text" id="fieldRef-${modelId}-${fieldCount}" name="fieldRef-${modelId}-${fieldCount}" placeholder="Reference model name">
+      
+      <label for="fieldRequired-${modelId}-${fieldCount}">Required:</label>
+      <input type="checkbox" id="fieldRequired-${modelId}-${fieldCount}" name="fieldRequired-${modelId}-${fieldCount}">
+      <br>
+      <button type="button" onclick="removeField(this)" class="remove-button">Remove Field</button>
+    `;
 
         document
           .getElementById(`fieldsContainer-${modelId}`)
@@ -180,67 +214,77 @@
       }
 
       document
-        .getElementById("projectForm")
-        .addEventListener("submit", function (event) {
-          event.preventDefault();
-          const projectName = document.getElementById("projectName").value;
-          const models = [];
+  .getElementById("projectForm")
+  .addEventListener("submit", function (event) {
+    event.preventDefault();
+    
+    const projectName = document.getElementById("projectName").value;
+    const projectType = document.getElementById("projectType").value; // Moved this line here
+    const models = [];
 
-          for (let i = 1; i <= modelCount; i++) {
-            const modelDiv = document.getElementById(`model-${i}`);
-            if (modelDiv) {
-              const modelName = document.getElementById(`modelName-${i}`).value;
-              const fields = [];
-              const fieldGroups = modelDiv.querySelectorAll(".field-group");
+    for (let i = 1; i <= modelCount; i++) {
+      const modelDiv = document.getElementById(`model-${i}`);
+      if (modelDiv) {
+        const modelName = document.getElementById(`modelName-${i}`).value;
+        const fields = [];
+        const fieldGroups = modelDiv.querySelectorAll(".field-group");
 
-              fieldGroups.forEach((fieldGroup) => {
-                const fieldName =
-                  fieldGroup.querySelector('input[type="text"]').value;
-                const fieldType = fieldGroup.querySelector("select").value;
-                const fieldRequired = fieldGroup.querySelector(
-                  'input[type="checkbox"]'
-                ).checked;
+        fieldGroups.forEach((fieldGroup) => {
+          const fieldName =
+            fieldGroup.querySelector('input[type="text"]').value;
+          const fieldType = fieldGroup.querySelector("select").value;
+          const fieldRef = fieldGroup.querySelector(
+            'input[name^="fieldRef"]'
+          ).value; // Capturing the ref value if it exists
+          const fieldRequired = fieldGroup.querySelector(
+            'input[type="checkbox"]'
+          ).checked;
 
-                fields.push({
-                  name: fieldName,
-                  type: fieldType,
-                  required: fieldRequired,
-                });
-              });
-
-              models.push({
-                name: modelName,
-                fields: fields,
-              });
-            }
-          }
-
-          const formData = {
-            projectName: projectName,
-            modelos: models,
-          };
-
-          // Hacer la solicitud POST a la API
-          fetch("/api/generate", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(formData),
-          })
-            .then((response) => response.blob())
-            .then((blob) => {
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement("a");
-              a.href = url;
-              a.download = `${projectName}.zip`;
-              a.click();
-              URL.revokeObjectURL(url);
-            })
-            .catch((error) => {
-              console.error("Error:", error);
-            });
+          fields.push({
+            name: fieldName,
+            type: fieldType,
+            ref: fieldRef || undefined, // Add the ref only if it exists
+            required: fieldRequired,
+          });
         });
+
+        models.push({
+          name: modelName,
+          fields: fields,
+        });
+      }
+    }
+
+    const formData = {
+      projectName: projectName,
+      projectType: projectType, // Now projectType is defined here
+      modelos: models,
+    };
+
+    const route =
+      projectType === "javascript" ? "/api/generatejs" : "/api/generate";
+
+    fetch(route, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(formData),
+    })
+      .then((response) => response.blob())
+      .then((blob) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${projectName}.zip`;
+        a.click();
+        URL.revokeObjectURL(url);
+      })
+      .catch((error) => {
+        console.error("Error:", error);
+      });
+  });
+
     </script>
   </body>
 </html>

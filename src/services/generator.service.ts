@@ -4,18 +4,23 @@ interface Field {
     ref?: string;     
 }
 
-const genModel = (name: string, fields: Field[]): string => {
+const gentsModel = (name: string, fields: Field[]): string => {
     const fieldLines = fields.map(field =>
-        field.ref ? `${field.name}: ${field.type} | ${field.ref};` : `${field.name}: ${field.type.charAt(0).toUpperCase()};`
+        field.ref 
+            ? `${field.name}: ${field.type} | ${field.ref};` 
+            : `${field.name}: ${field.type.charAt(0).toUpperCase()};`
     ).join('\n');
 
     const schemaLines = fields.map(field =>
-        field.ref ? `${field.name}: { type: Schema.Types.ObjectId, ref: '${field.ref}' }` : `${field.name}: { type: ${field.type.charAt(0).toUpperCase() + field.type.slice(1)} }`
+        field.ref 
+            ? `${field.name}: { type: Schema.Types.ObjectId, ref: '${field.ref}' }`  // Si tiene referencia
+            : `${field.name}: { type: ${field.type.charAt(0).toUpperCase() + field.type.slice(1)} }` // Si no tiene referencia
     ).join(',\n');
 
     return `
 import { Schema, model } from 'mongoose';
 import { ${name} } from '../interfaces/${name}.interface';
+
 export const ${name}Model = new Schema<${name}>({
     ${schemaLines}
 });
@@ -24,19 +29,25 @@ export default model<${name}>('${name}', ${name}Model);
 `;
 };
 
-const genModelInterface = (name: string, fields: Field[]): string => {
+
+const gentsModelInterface = (name: string, fields: Field[]): string => {
     const interfaceLines = fields.map(field =>
-        field.name + ': ' + field.type.charAt(0).toUpperCase() + field.type.slice(1) + ';'
+        field.ref
+            ? `${field.name}: ${field.type.charAt(0).toUpperCase() + field.type.slice(1)} | ${field.ref};`  
+            : `${field.name}: ${field.type.charAt(0).toUpperCase() + field.type.slice(1)};` 
     ).join('\n');
 
     return `
+import { ObjectId } from 'mongodb';
+
 export interface ${name} {
     ${interfaceLines}
 }
 `;
 };
 
-const genServices = (name: string, fields: Field[]): string => {
+
+const gentsServices = (name: string, fields: Field[]): string => {
     return `
 import { ${name} } from '../interfaces/${name}.interface';
 import  ${name}Model  from '../models/${name}.model';
@@ -71,7 +82,7 @@ export default {
 `;
 };
 
-const genControllers = (name: string, fields: Field[]): string => {
+const gentsControllers = (name: string, fields: Field[]): string => {
     return `
 import { Request, Response } from 'express';
 import ${name}Services from '../services/${name}.service';
@@ -135,7 +146,7 @@ export default {
 `;
 };
 
-const genRoutes = (name: string): string => {
+const gentsRoutes = (name: string): string => {
     return `
 import { Router } from 'express';
 import ${name}Controllers from '../controllers/${name}.controller';
@@ -154,7 +165,7 @@ export default router;
 `;
 };
 
-const genIndex = (names: string[], projectName: string): string => {
+const gentsIndex = (names: string[], projectName: string): string => {
     const imports = names.map(name => `import ${name}Routes from '../src/routes/${name}.routes';`).join('\n');
     const routes = names.map(name => `app.use('/${name}', ${name}Routes);`).join('\n');
 
@@ -338,12 +349,12 @@ const gentTsConfig = () => {
 }
 
 export default {
-    genModel,
-    genServices,
-    genModelInterface,
-    genControllers,
-    genRoutes,
-    genIndex,
+    gentsModel,
+    gentsServices,
+    gentsModelInterface,
+    gentsControllers,
+    gentsRoutes,
+    gentsIndex,
     genPackageJson,
     generateBat,
     gentTsConfig
