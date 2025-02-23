@@ -1,4 +1,4 @@
-import generatorService from '../services/generatorJS.service';
+import generatorService from '../services/generatorPostgresJs.service';
 import path from 'path';
 import { Request, Response } from 'express';
 import fs from 'fs';
@@ -9,6 +9,7 @@ const ensureDirExists = (dir: string): void => {
         fs.mkdirSync(dir, { recursive: true });
     }
 };
+
 const capitalizeType = (type: string) => {
     return type.charAt(0).toUpperCase() + type.slice(1);
 };
@@ -70,7 +71,7 @@ const genRoutes = (modelos: any[], dir: string): void => {
 
         try {
             const { name } = modelo;
-            const routesContent = generatorService.genJsRoutes(name);
+            const routesContent = generatorService.genJsRoutes(name, modelo.fields);
             const filePath = path.join(outputDir, `${name}.routes.js`);
             fs.writeFileSync(filePath, routesContent);
             console.log(`Rutas ${name} generadas en ${filePath}`);
@@ -92,7 +93,18 @@ const genPackageJson = (projectName: string): any => {
     return generatorService.genPackageJson(projectName);
 };
 
-const createJSProject = async (req: Request, res: Response): Promise<void> => {
+const genSequelizeConfig = (projectName: string): string => {
+    const dbConfig = {
+        database: `${projectName}_db`,
+        username: 'postgres',
+        password: 'postgres',
+        host: 'localhost',
+        port: 5432
+    }
+    return generatorService.genSequelizeConfig(projectName, dbConfig);
+}
+
+const createPgProject = async (req: Request, res: Response): Promise<void> => {
     const { modelos, projectName } = req.body;
 
     if (!modelos || !projectName) {
@@ -113,12 +125,22 @@ const createJSProject = async (req: Request, res: Response): Promise<void> => {
         console.log(`Source directory: ${srcDir}`);
         ensureDirExists(srcDir);
 
+        const configDir = path.join(srcDir, 'config');
+        console.log(`Config directory: ${configDir}`);
+        ensureDirExists(configDir);
+
+        // Generar el archivo de configuración de Sequelize
+        const sequelizeConfigContent = genSequelizeConfig(projectName);
+        fs.writeFileSync(path.join(configDir, 'sequelize.config.js'), sequelizeConfigContent);
+        console.log(`Archivo de configuración de Sequelize generado en: ${configDir}`);
+
         // Generar modelos, servicios, controladores, rutas, etc.
         genModels(modelos, srcDir);
         genJsService(modelos, srcDir);
         genControllers(modelos, srcDir);
         genRoutes(modelos, srcDir);
         genIndex(modelos, srcDir, projectName);
+        genSwaggerJs(modelos, srcDir, projectName);
 
         const packageJsonContent = genPackageJson(projectName);
         fs.writeFileSync(path.join(projectDir, 'package.json'), packageJsonContent);
@@ -180,7 +202,12 @@ const genJsService = (modelos: any[], dir: string): void => {
         }
     }
 };
-
+const genSwaggerJs = (modelos: any[], dir: string, projectName: string): void => {
+    const outputDir = path.join(dir, 'swagger.js');
+    const swaggerContent = generatorService.genSwaggerJs(modelos, projectName);
+    fs.writeFileSync(outputDir, swaggerContent);
+    console.log(`Swagger generado en ${outputDir}`);
+};
 export default {
-    createJSProject
+    createPgProject
 };

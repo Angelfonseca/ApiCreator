@@ -1,18 +1,17 @@
-import generatorService from '../services/generatorJS.service';
+import generatorService from '../services/generatorPostgresTs.service';
 import path from 'path';
 import { Request, Response } from 'express';
 import fs from 'fs';
 import archiver from 'archiver';
 
+// Función para asegurarse de que un directorio existe
 const ensureDirExists = (dir: string): void => {
     if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
     }
 };
-const capitalizeType = (type: string) => {
-    return type.charAt(0).toUpperCase() + type.slice(1);
-};
 
+// Generar modelos
 const genModels = (modelos: any[], dir: string): void => {
     const outputDir = path.join(dir, 'models');
     ensureDirExists(outputDir);
@@ -26,8 +25,8 @@ const genModels = (modelos: any[], dir: string): void => {
         try {
             const name = modelo.name;
             const fields = modelo.fields;
-            const modelContent = generatorService.genJsModel(name, fields);
-            const filePath = path.join(outputDir, `${name}.model.js`);
+            const modelContent = generatorService.genTsModel(name, fields);
+            const filePath = path.join(outputDir, `${name}.model.ts`);
             fs.writeFileSync(filePath, modelContent);
             console.log(`Modelo ${name} generado en ${filePath}`);
         } catch (error: any) {
@@ -36,6 +35,30 @@ const genModels = (modelos: any[], dir: string): void => {
     }
 };
 
+// Generar servicios
+const genServices = (modelos: any[], dir: string): void => {
+    const outputDir = path.join(dir, 'services');
+    ensureDirExists(outputDir);
+
+    for (const modelo of modelos) {
+        if (!modelo.name) {
+            console.error(`Servicio inválido: falta 'name'`);
+            continue;
+        }
+
+        try {
+            const name = modelo.name;
+            const serviceContent = generatorService.genTsService(name);
+            const filePath = path.join(outputDir, `${name}.service.ts`);
+            fs.writeFileSync(filePath, serviceContent);
+            console.log(`Servicio ${name} generado en ${filePath}`);
+        } catch (error: any) {
+            console.error(`Error al generar el servicio ${modelo.name}: ${error.message}`);
+        }
+    }
+};
+
+// Generar controladores
 const genControllers = (modelos: any[], dir: string): void => {
     const outputDir = path.join(dir, 'controllers');
     ensureDirExists(outputDir);
@@ -48,8 +71,8 @@ const genControllers = (modelos: any[], dir: string): void => {
 
         try {
             const name = modelo.name;
-            const controllerContent = generatorService.genJsController(name);
-            const filePath = path.join(outputDir, `${name}.controller.js`);
+            const controllerContent = generatorService.genTsController(name);
+            const filePath = path.join(outputDir, `${name}.controller.ts`);
             fs.writeFileSync(filePath, controllerContent);
             console.log(`Controlador ${name} generado en ${filePath}`);
         } catch (error: any) {
@@ -58,6 +81,7 @@ const genControllers = (modelos: any[], dir: string): void => {
     }
 };
 
+// Generar rutas
 const genRoutes = (modelos: any[], dir: string): void => {
     const outputDir = path.join(dir, 'routes');
     ensureDirExists(outputDir);
@@ -70,8 +94,8 @@ const genRoutes = (modelos: any[], dir: string): void => {
 
         try {
             const { name } = modelo;
-            const routesContent = generatorService.genJsRoutes(name);
-            const filePath = path.join(outputDir, `${name}.routes.js`);
+            const routesContent = generatorService.genTsRoutes(name);
+            const filePath = path.join(outputDir, `${name}.routes.ts`);
             fs.writeFileSync(filePath, routesContent);
             console.log(`Rutas ${name} generadas en ${filePath}`);
         } catch (error: any) {
@@ -80,19 +104,48 @@ const genRoutes = (modelos: any[], dir: string): void => {
     }
 };
 
+// Generar archivo index.ts
 const genIndex = (modelos: any[], dir: string, projectName: string): void => {
-    const outputDir = path.join(dir, 'index.js');
+    const outputDir = path.join(dir, 'index.ts');
     const names = modelos.map(modelo => modelo.name);
-    const indexContent = generatorService.genJsIndex(names, projectName);
+    const indexContent = generatorService.genTsIndex(names, projectName);
     fs.writeFileSync(outputDir, indexContent);
     console.log(`Index generado en ${outputDir}`);
 };
 
-const genPackageJson = (projectName: string): any => {
+const genSwaggerTs = (modelos: any[], dir: string, projectName: string): void => {
+    const outputDir = path.join(dir, 'swagger.ts');
+    const swaggerContent = generatorService.genSwaggerTs(modelos, projectName);
+    fs.writeFileSync(outputDir, swaggerContent);
+    console.log(`Swagger generado en ${outputDir}`);
+};
+
+// Generar archivo package.json
+const genPackageJson = (projectName: string): string => {
     return generatorService.genPackageJson(projectName);
 };
 
-const createJSProject = async (req: Request, res: Response): Promise<void> => {
+// Generar archivo tsconfig.json
+const genTsConfig = (): string => {
+    return generatorService.genTsConfig();
+};
+
+
+
+// Generar archivo de configuración de Sequelize
+const genSequelizeConfig = (projectName: string): string => {
+    const dbConfig = {
+        database: `${projectName}_db`,
+        username: 'postgres',
+        password: 'postgres',
+        host: 'localhost',
+        port: 5432,
+    };
+    return generatorService.genSequelizeConfig(dbConfig);
+};
+
+// Crear proyecto completo
+const createPgTSProject = async (req: Request, res: Response): Promise<void> => {
     const { modelos, projectName } = req.body;
 
     if (!modelos || !projectName) {
@@ -113,18 +166,34 @@ const createJSProject = async (req: Request, res: Response): Promise<void> => {
         console.log(`Source directory: ${srcDir}`);
         ensureDirExists(srcDir);
 
-        // Generar modelos, servicios, controladores, rutas, etc.
+        // Generar archivo de configuración de Sequelize
+        const configDir = path.join(srcDir, 'config');
+        ensureDirExists(configDir);
+        const sequelizeConfigContent = genSequelizeConfig(projectName);
+        fs.writeFileSync(path.join(configDir, 'sequelize.config.ts'), sequelizeConfigContent);
+        console.log(`Archivo de configuración de Sequelize generado en: ${configDir}`);
+
+        // Generar archivos del proyecto
         genModels(modelos, srcDir);
-        genJsService(modelos, srcDir);
+        genServices(modelos, srcDir);
         genControllers(modelos, srcDir);
         genRoutes(modelos, srcDir);
         genIndex(modelos, srcDir, projectName);
+        genSwaggerTs(modelos, srcDir, projectName);
 
+
+        // Generar archivos adicionales
         const packageJsonContent = genPackageJson(projectName);
         fs.writeFileSync(path.join(projectDir, 'package.json'), packageJsonContent);
         console.log(`package.json generado en: ${projectDir}`);
 
-        // Crear el archivo ZIP
+
+
+        const tsConfigContent = genTsConfig();
+        fs.writeFileSync(path.join(projectDir, 'tsconfig.json'), tsConfigContent);
+        console.log(`tsconfig.json generado en: ${projectDir}`);
+
+        // Crear archivo ZIP
         const zipFilePath = path.join(outputBaseDir, `${projectName}.zip`);
         console.log(`Ruta del archivo ZIP: ${zipFilePath}`);
 
@@ -152,35 +221,12 @@ const createJSProject = async (req: Request, res: Response): Promise<void> => {
         archive.pipe(output);
         archive.directory(projectDir, false);
         await archive.finalize();
-
     } catch (error) {
         console.error('Error en la creación del proyecto:', error);
         res.status(500).send('Error al crear el proyecto');
     }
 };
 
-const genJsService = (modelos: any[], dir: string): void => {
-    const outputDir = path.join(dir, 'services');
-    ensureDirExists(outputDir);
-
-    for (const modelo of modelos) {
-        if (!modelo.name) {
-            console.error(`Servicio inválido: falta 'name'`);
-            continue;
-        }
-
-        try {
-            const name = modelo.name;
-            const serviceContent = generatorService.genJsService(name);
-            const filePath = path.join(outputDir, `${name}.service.js`);
-            fs.writeFileSync(filePath, serviceContent);
-            console.log(`Servicio ${name} generado en ${filePath}`);
-        } catch (error: any) {
-            console.error(`Error al generar el servicio ${modelo.name}: ${error.message}`);
-        }
-    }
-};
-
 export default {
-    createJSProject
+    createPgTSProject,
 };
