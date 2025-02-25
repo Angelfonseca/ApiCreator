@@ -16,7 +16,12 @@ Este proyecto es una aplicación web que permite generar APIs automáticamente e
 ```bash
 git clone https://github.com/Angelfonseca/ApiCreator.git
 cd ApiCreator
-``
+```
+
+### 2️⃣ Instalar dependencias  
+```bash
+npm install
+```
 
 ### 🛠️ Configuración del archivo de variables de entorno  
 
@@ -24,19 +29,13 @@ Antes de ejecutar el proyecto, es **necesario** configurar un archivo `.env` en 
 
 ```plaintext
 AI_API_KEY=TU_CLAVE_DE_API
-
-### 2️⃣ Instalar dependencias  
-```bash
-npm install
 ```
 
 ### 3️⃣ Iniciar el servidor  
 ```bash
 npm start
 ```
-⚡ Por defecto, la aplicación se ejecutará en [http://localhost:3000](http://localhost:3000).
-
----
+⚡ Por defecto, la aplicación se ejecutará en [http://localhost:3000](http://localhost
 
 ## 🛠️ Cómo usar la aplicación  
 1. Ingresar el esquema JSON en la caja de texto.  
