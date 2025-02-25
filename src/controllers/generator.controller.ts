@@ -14,7 +14,7 @@ const genModels = (modelos: any[], dir: string): void => {
     for (const modelo of modelos) {
         const name = modelo.name;
         const fields = modelo.fields;
-        const modelContent = generatorService.gentsModel(name, fields);
+        const modelContent = generatorService.genMongooseTSModel(name, fields);
 
         const filePath = path.join(outputDir, `${name}.model.ts`);
 
@@ -33,7 +33,7 @@ const genServices = (modelos: any[], dir: string): void => {
     for (const modelo of modelos) {
         const name = modelo.name;
         const fields = modelo.fields;
-        const serviceContent = generatorService.gentsServices(name, fields);
+        const serviceContent = generatorService.genMongooseTSService(name);
 
         if (typeof serviceContent !== 'string') {
             console.error(`Error al generar el servicio para ${name}: el contenido es undefined.`);
@@ -54,7 +54,7 @@ const genModelInterface = (modelos: any[], dir: string): void => {
     for (const modelo of modelos) {
         const name = modelo.name;
         const fields = modelo.fields;
-        const interfaceContent = generatorService.gentsModelInterface(name, fields);
+        const interfaceContent = generatorService.genMongooseTSInterface(name, fields);
 
         const filePath = path.join(outputDir, `${name}.interface.ts`);
 
@@ -73,8 +73,7 @@ const genControllers = (modelos: any[], dir: string): void => {
 
     for (const modelo of modelos) {
         const name = modelo.name;
-        const fields = modelo.fields;
-        const controllerContent = generatorService.gentsControllers(name, fields);
+        const controllerContent = generatorService.genMongooseTSController(name);
 
         const filePath = path.join(outputDir, `${name}.controller.ts`);
 
@@ -97,7 +96,7 @@ const genRoutes = (modelos: any[], dir: string): void => {
 
     for (const modelo of modelos) {
         const name = modelo.name;
-        const routesContent = generatorService.gentsRoutes(name);
+        const routesContent = generatorService.genMongooseTSRoutes(name);
 
         const filePath = path.join(outputDir, `${name}.routes.ts`);
 
@@ -106,12 +105,27 @@ const genRoutes = (modelos: any[], dir: string): void => {
     }
 };
 
+const genSwagger = (modelos: any[], dir: string, projectName: string): void => {
+    const outputDir = path.join(dir);
+
+    if (!fs.existsSync(outputDir)) {
+        fs.mkdirSync(outputDir, { recursive: true });
+    }
+
+    const swaggerContent = generatorService.genSwaggerTs(modelos, projectName);
+
+    const filePath = path.join(outputDir, 'swagger.ts');
+
+    fs.writeFileSync(filePath, swaggerContent);
+    console.log(`Swagger generado en ${filePath}`);
+}
+
 
 const genIndex = (modelos: any[], dir: string, projectName: string): void => {
     const outputDir = path.join(dir, 'index.ts');
 
     const names = modelos.map(modelo => modelo.name);
-    const indexContent = generatorService.gentsIndex(names, projectName);
+    const indexContent = generatorService.genMongooseTSIndex(names, projectName);
 
     fs.writeFileSync(outputDir, indexContent);
     console.log(`Index generado en ${outputDir}`);
@@ -156,14 +170,12 @@ const createProject = async (req: Request, res: Response): Promise<void> => {
         genModelInterface(modelos, srcDir);
         genRoutes(modelos, srcDir);
         genIndex(modelos, srcDir, projectName);
+        genSwagger(modelos, srcDir, projectName);
+
 
         const packageJsonContent = genPackageJson(projectName);
         fs.writeFileSync(path.join(projectDir, 'package.json'), packageJsonContent);
         console.log(`package.json creado en: ${projectDir}`);
-
-        const bat = generatorService.generateBat(projectName);
-        fs.writeFileSync(path.join(projectDir, 'start.bat'), bat);
-        console.log(`start.bat creado en: ${projectDir}`);
 
         const tsconfig = generatorService.gentTsConfig();
         fs.writeFileSync(path.join(projectDir, 'tsconfig.json'), tsconfig);

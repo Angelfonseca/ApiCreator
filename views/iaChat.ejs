@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat IA - Generador de APIs</title>
+    
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+
+    <style>
+        body { 
+            background-color: #f8f9fa;
+        }
+        .chat-container {
+            max-width: 600px;
+            margin: auto;
+            margin-top: 50px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+        }
+        .chat-box {
+            max-height: 400px;
+            overflow-y: auto;
+            padding: 10px;
+        }
+        .message {
+            display: flex;
+            margin-bottom: 15px;
+            align-items: flex-start;
+        }
+        .message.user {
+            justify-content: flex-end;
+        }
+        .message .bubble {
+            max-width: 75%;
+            padding: 10px;
+            border-radius: 10px;
+        }
+        .message.user .bubble {
+            background: #007bff;
+            color: white;
+            text-align: right;
+        }
+        .message.ai .bubble {
+            background: #e9ecef;
+        }
+        .message .avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            margin-right: 10px;
+        }
+        .message.user .avatar {
+            margin-left: 10px;
+            margin-right: 0;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            font-size: 14px;
+            color: gray;
+        }
+        .json-container {
+            background: #f1f3f5;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 14px;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container chat-container">
+    <h4 class="text-center">🤖 Chat IA - Generador de APIs</h4>
+
+    <!-- Caja de chat -->
+    <div class="chat-box border rounded p-3">
+        <div id="chat-messages"></div>
+        <div id="loading" class="loading">⏳ Generando respuesta...</div>
+    </div>
+
+    <!-- Visor de JSON -->
+    <div class="mt-3">
+        <label for="jsonViewer" class="form-label">Visor de JSON:</label>
+        <textarea id="jsonViewer" class="json-container form-control" rows="10"></textarea>
+        <button class="btn btn-success w-100 mt-2" onclick="sendJson()">Enviar JSON</button>
+    </div>
+
+
+    <!-- Entrada de datos -->
+    <div class="mt-3">
+        <label for="userPrompt" class="form-label">Escribe tu prompt:</label>
+        <textarea id="userPrompt" class="form-control" rows="3" placeholder="Ej: Crea un modelo de usuarios con nombre y correo"></textarea>
+    </div>
+
+    <!-- Selector de base de datos -->
+    <div class="mt-2">
+        <label for="dbSelect" class="form-label">Selecciona la base de datos:</label>
+        <select id="dbSelect" class="form-select">
+            <option value="pg">PostgreSQL (Sequelize)</option>
+            <option value="mdb">MongoDB (Mongoose)</option>
+        </select>
+    </div>
+
+    <!-- Selector de lenguaje -->
+    <div class="mt-2">
+        <label for="langSelect" class="form-label">Selecciona el lenguaje:</label>
+        <select id="langSelect" class="form-select">
+            <option value="js">JavaScript</option>
+            <option value="ts">TypeScript</option>
+        </select>
+    </div>
+
+    <!-- Botón de enviar -->
+    <button class="btn btn-primary w-100 mt-3" onclick="sendMessage()">Generar API</button>
+</div>
+
+<!-- Bootstrap y Scripts -->
+<script>
+    let jsonValue = {};
+    
+    async function sendJson() {
+    const jsonViewer = document.getElementById('jsonViewer').value.trim();
+    const db = document.getElementById('dbSelect').value;
+    const lang = document.getElementById('langSelect').value;
+
+    if (!jsonViewer) {
+        alert("Por favor, ingresa un JSON válido.");
+        return;
+    }
+
+    let endpoint = '';
+
+    if (db === 'mdb' && lang === 'ts') {
+        endpoint = 'api/generatemdbts';
+    } else if (db === 'mdb' && lang === 'js') {
+        endpoint = 'api/generatemdbjs';
+    } else if (db === 'pg' && lang === 'js') {
+        endpoint = 'api/generatepgjs';
+    } else if (db === 'pg' && lang === 'ts') {
+        endpoint = 'api/generatepgts';
+    }
+
+    try {
+        const response = await axios.post(endpoint, JSON.parse(jsonViewer), {
+            responseType: 'blob' // ⚠️ Especificar que esperamos un archivo
+        });
+
+        if (!response.data) {
+            throw new Error("La respuesta está vacía");
+        }
+
+        const blob = new Blob([response.data], { type: 'application/zip' });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+
+        link.href = url;
+        link.download = 'response.zip';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        // Liberar memoria
+        window.URL.revokeObjectURL(url);
+
+        alert('✅ JSON enviado correctamente y archivo .zip descargado');
+    } catch (error) {
+        console.error('❌ Error:', error);
+        alert('❌ Ocurrió un error al enviar el JSON.');
+    }
+}
+
+    async function sendMessage() {
+        const userPrompt = document.getElementById('userPrompt').value.trim();
+        const db = document.getElementById('dbSelect').value;
+        const lang = document.getElementById('langSelect').value;
+        const chatBox = document.getElementById('chat-messages');
+        const loading = document.getElementById('loading');
+        const jsonViewer = document.getElementById('jsonViewer');
+        
+
+        if (!userPrompt) {
+            alert("Por favor, escribe un prompt.");
+            return;
+        }
+
+        // Mostrar mensaje del usuario en la interfaz
+        chatBox.innerHTML += `
+            <div class="message user">
+                <div class="bubble">${userPrompt}</div>
+                <img class="avatar" src="https://cdn-icons-png.flaticon.com/512/847/847969.png" alt="User">
+            </div>
+        `;
+        chatBox.scrollTop = chatBox.scrollHeight;
+
+        // Mostrar indicador de carga
+        loading.style.display = "block";
+
+        // Determinar ruta según la selección
+        let endpoint = `/api/ai`;
+
+        try {
+            const response = await axios.post(endpoint, { userPrompt, db });
+            const aiResponse = response.data.response;
+            jsonValue = aiResponse.json;
+
+            // Mostrar respuesta de la IA
+            chatBox.innerHTML += `
+                <div class="message ai">
+                    <img class="avatar" src="https://cdn-icons-png.flaticon.com/512/4712/4712027.png" alt="AI">
+                    <div class="bubble">
+                        <strong>🤖 Explicación:</strong><br>${aiResponse.text}
+                        <br><br>
+                        <strong>📜 Código generado:</strong>
+                        <div class="json-container">${JSON.stringify(aiResponse.json, null, 2)}</div>
+                    </div>
+                </div>
+            `;
+
+            // Mostrar JSON en el visor
+            jsonViewer.value = JSON.stringify(aiResponse.json, null, 2);
+
+        } catch (error) {
+            console.error("Error:", error);
+            chatBox.innerHTML += `
+                <div class="message ai">
+                    <img class="avatar" src="https://cdn-icons-png.flaticon.com/512/4712/4712027.png" alt="AI">
+                    <div class="bubble text-danger">❌ Ocurrió un error al procesar tu solicitud.</div>
+                </div>
+            `;
+        }
+
+        // Ocultar indicador de carga
+        loading.style.display = "none";
+
+        // Limpiar input
+        document.getElementById('userPrompt').value = "";
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+</script>
+
+</body>
+</html>

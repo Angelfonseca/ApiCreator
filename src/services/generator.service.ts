@@ -1,193 +1,326 @@
 interface Field {
     name: string;
-    type: string; 
-    ref?: string;     
+    type: string; // Ejemplo: 'STRING', 'INTEGER', 'BOOLEAN', etc.
+    allowNull?: boolean; // Si el campo puede ser nulo
+    defaultValue?: any; // Valor por defecto
+    references?: { model: string; key: string }; // Para relaciones
+    fields?: Field[]; // Subcampos para objetos anidados
 }
+const genMongooseTSModel = (name: string, fields: Field[]): string => {
+    const generateSchemaLines = (fields: Field[]): string => {
+        return fields.map(field => {
+            if (field.type === "object" && field.fields) {
+                // Si el campo es un objeto, generar un subesquema
+                return `${field.name}: { ${generateSchemaLines(field.fields)} }`;
+            } else if (field.references) {
+                // Si el campo tiene una referencia
+                return `${field.name}: { type: Schema.Types.ObjectId, ref: '${field.references.model}' }`;
+            } else {
+                // Si el campo es primitivo
+                return `${field.name}: { type: ${field.type.charAt(0).toUpperCase() + field.type.slice(1)} }`;
+            }
+        }).join(',\n');
+    };
 
-const gentsModel = (name: string, fields: Field[]): string => {
-    const fieldLines = fields.map(field =>
-        field.ref 
-            ? `${field.name}: ${field.type} | ${field.ref};` 
-            : `${field.name}: ${field.type.charAt(0).toUpperCase()};`
-    ).join('\n');
-
-    const schemaLines = fields.map(field =>
-        field.ref 
-            ? `${field.name}: { type: Schema.Types.ObjectId, ref: '${field.ref}' }`  // Si tiene referencia
-            : `${field.name}: { type: ${field.type.charAt(0).toUpperCase() + field.type.slice(1)} }` // Si no tiene referencia
-    ).join(',\n');
+    const schemaLines = generateSchemaLines(fields);
 
     return `
 import { Schema, model } from 'mongoose';
-import { ${name} } from '../interfaces/${name}.interface';
 
-export const ${name}Model = new Schema<${name}>({
-    ${schemaLines}
+const ${name}Schema = new Schema({
+${schemaLines}
 });
 
-export default model<${name}>('${name}', ${name}Model);
+export default model('${name}', ${name}Schema);
 `;
 };
 
+const genMongooseTSInterface = (name: string, fields: Field[]): string => {
+    const generateInterfaceLines = (fields: Field[]): string => {
+        return fields.map(field => {
+            if (field.type === "object" && field.fields) {
+                // Si el campo es un objeto, generar una interfaz anidada
+                return `${field.name}?: {\n${generateInterfaceLines(field.fields)}\n};`;
+            } else if (field.references) {
+                // Si el campo tiene una referencia
+                return `${field.name}?: Schema.Types.ObjectId | ${field.references.model};`;
+            } else {
+                // Si el campo es primitivo
+                return `${field.name}?: ${field.type.charAt(0).toUpperCase() + field.type.slice(1)};`;
+            }
+        }).join('\n');
+    };
 
-const gentsModelInterface = (name: string, fields: Field[]): string => {
-    const interfaceLines = fields.map(field =>
-        field.ref
-            ? `${field.name}: ${field.type.charAt(0).toUpperCase() + field.type.slice(1)} | ${field.ref};`  
-            : `${field.name}: ${field.type.charAt(0).toUpperCase() + field.type.slice(1)};` 
-    ).join('\n');
+    const interfaceLines = generateInterfaceLines(fields);
 
     return `
-import { ObjectId } from 'mongodb';
+import { Schema } from 'mongoose';
 
 export interface ${name} {
-    ${interfaceLines}
+ ${interfaceLines}
 }
 `;
 };
 
+const genMongooseTSService = (name: string): string => {
+    const capitalizedName = name.charAt(0).toUpperCase() + name.slice(1);
 
-const gentsServices = (name: string, fields: Field[]): string => {
     return `
-import { ${name} } from '../interfaces/${name}.interface';
-import  ${name}Model  from '../models/${name}.model';
+import ${capitalizedName}Model from '../models/${name}.model';
 
-const create${name} = async (data: ${name}): Promise<${name}> => {
-    return ${name}Model.create(data);
+export const getAll = async () => {
+    try {
+        return await ${capitalizedName}Model.find();
+    } catch (error: any) {
+        throw new Error(\`Error fetching ${capitalizedName}s: \${error.message}\`);
+    }
 };
 
-const get${name} = async (id: string): Promise<${name} | null> => {
-    return ${name}Model.findById(id);
+export const create = async (data: any) => {
+    try {
+        const newRecord = new ${capitalizedName}Model(data);
+        return await newRecord.save();
+    } catch (error: any) {
+        throw new Error(\`Error creating ${capitalizedName}: \${error.message}\`);
+    }
 };
 
-const get${name}s = async (): Promise<${name}[]> => {
-    return ${name}Model.find();
+export const getById = async (id: string) => {
+    try {
+        const record = await ${capitalizedName}Model.findById(id);
+        if (!record) {
+            throw new Error(\`${capitalizedName} with id \${id} not found\`);
+        }
+        return record;
+    } catch (error: any) {
+        throw new Error(\`Error fetching ${capitalizedName}: \${error.message}\`);
+    }
 };
 
-const update${name} = async (id: string, data: ${name}): Promise<${name} | null> => {
-    return ${name}Model.findByIdAndUpdate(id, data, { new: true });
+export const updateById = async (id: string, data: any) => {
+    try {
+        const record = await ${capitalizedName}Model.findByIdAndUpdate(id, data, { new: true });
+        if (!record) {
+            throw new Error(\`${capitalizedName} with id \${id} not found\`);
+        }
+        return record;
+    } catch (error: any) {
+        throw new Error(\`Error updating ${capitalizedName}: \${error.message}\`);
+    }
 };
 
-const delete${name} = async (id: string): Promise<${name} | null> => {
-    return ${name}Model.findByIdAndDelete(id);
-};
-
-export default {
-    create${name},
-    get${name},
-    get${name}s,
-    update${name},
-    delete${name}
+export const deleteById = async (id: string) => {
+    try {
+        const record = await ${capitalizedName}Model.findByIdAndDelete(id);
+        if (!record) {
+            throw new Error(\`${capitalizedName} with id \${id} not found\`);
+        }
+        return { success: true, message: \`${capitalizedName} deleted successfully\` };
+    } catch (error: any) {
+        throw new Error(\`Error deleting ${capitalizedName}: \${error.message}\`);
+    }
 };
 `;
 };
 
-const gentsControllers = (name: string, fields: Field[]): string => {
+const genMongooseTSController = (name: string): string => {
+    const capitalizedName = name.charAt(0).toUpperCase() + name.slice(1);
+
     return `
 import { Request, Response } from 'express';
-import ${name}Services from '../services/${name}.service';
+import { getAll, create, getById, updateById, deleteById } from '../services/${name}.service';
 
-const create${name} = async (req: Request, res: Response) => {
+export const getAllController = async (req: Request, res: Response) => {
     try {
-        const ${name} = await ${name}Services.create${name}(req.body);
-        res.status(201).json(${name});
+        const data = await getAll();
+        res.status(200).json({ success: true, data });
     } catch (error: any) {
-        res.status(400).json({ message: error.message });
+        res.status(500).json({ success: false, error: error.message });
     }
 };
 
-const get${name} = async (req: Request, res: Response) => {
+export const createController = async (req: Request, res: Response) => {
     try {
-        const ${name} = await ${name}Services.get${name}(req.params.id);
-        res.status(200).json(${name});
+        const data = req.body;
+        const record = await create(data);
+        res.status(201).json({ success: true, data: record });
     } catch (error: any) {
-        res.status(404).json({ message: error.message });
+        res.status(400).json({ success: false, error: error.message });
     }
 };
 
-const get${name}s = async (req: Request, res: Response) => {
+export const getByIdController = async (req: Request, res: Response) => {
     try {
-        const ${name}s = await ${name}Services.get${name}s();
-        res.status(200).json(${name}s);
+        const { id } = req.params;
+        const record = await getById(id);
+        res.status(200).json({ success: true, data: record });
     } catch (error: any) {
-        res.status(404).json({ message: error.message });
+        res.status(404).json({ success: false, error: error.message });
     }
 };
 
-const update${name} = async (req: Request, res: Response) => {
+export const updateByIdController = async (req: Request, res: Response) => {
     try {
-        const ${name} = await ${name}Services.update${name}(req.params.id, req.body);
-        res.status(200).json(${name});
+        const { id } = req.params;
+        const data = req.body;
+        const record = await updateById(id, data);
+        res.status(200).json({ success: true, data: record });
     } catch (error: any) {
-        res.status(400).json({ message: error.message });
+        res.status(400).json({ success: false, error: error.message });
     }
 };
 
-const delete${name} = async (req: Request, res: Response) => {
+export const deleteByIdController = async (req: Request, res: Response) => {
     try {
-        const ${name} = await ${name}Services.delete${name}(req.params.id);
-        res.status(200).json(${name});
+        const { id } = req.params;
+        await deleteById(id);
+        res.status(200).json({ success: true, message: '${capitalizedName} deleted successfully' });
     } catch (error: any) {
-        res.status(400).json({ message: error.message });
+        res.status(400).json({ success: false, error: error.message });
     }
-};
-
-
-
-// Implement other controller methods similarly...
-
-export default {
-    create${name},
-    get${name},
-    get${name}s,
-    update${name},
-    delete${name}    
 };
 `;
 };
 
-const gentsRoutes = (name: string): string => {
+const genMongooseTSRoutes = (name: string): string => {
+    const capitalizedName = name.charAt(0).toUpperCase() + name.slice(1);
+
     return `
-import { Router } from 'express';
-import ${name}Controllers from '../controllers/${name}.controller';
+import express from 'express';
+import { 
+    getAllController, 
+    createController, 
+    getByIdController, 
+    updateByIdController, 
+    deleteByIdController 
+} from '../controllers/${name}.controller';
 
-const router = Router();
+const router = express.Router();
 
-router.post('/', ${name}Controllers.create${name});
-router.get('/:id', ${name}Controllers.get${name});
-router.get('/', ${name}Controllers.get${name}s);
-router.put('/:id', ${name}Controllers.update${name});
-router.delete('/:id', ${name}Controllers.delete${name});
+/**
+ * @swagger
+ * /api/${name}:
+ *   get:
+ *     summary: Get all ${name} records
+ *     description: Returns a list of all ${name} records.
+ *     responses:
+ *       200:
+ *         description: Successfully retrieved records list.
+ */
+router.get('/', getAllController);
 
-// Implement other routes...
+/**
+ * @swagger
+ * /api/${name}:
+ *   post:
+ *     summary: Create a new ${name} record
+ *     description: Creates a new ${name} record with provided data.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/${capitalizedName}'
+ *     responses:
+ *       201:
+ *         description: Record created successfully.
+ */
+router.post('/', createController);
+
+/**
+ * @swagger
+ * /api/${name}/{id}:
+ *   get:
+ *     summary: Get ${name} by ID
+ *     description: Returns a single ${name} record by ID.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Record found successfully.
+ *       404:
+ *         description: Record not found.
+ */
+router.get('/:id', getByIdController);
+
+/**
+ * @swagger
+ * /api/${name}/{id}:
+ *   put:
+ *     summary: Update ${name} by ID
+ *     description: Updates a ${name} record by ID.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/${capitalizedName}'
+ *     responses:
+ *       200:
+ *         description: Record updated successfully.
+ *       404:
+ *         description: Record not found.
+ */
+router.put('/:id', updateByIdController);
+
+/**
+ * @swagger
+ * /api/${name}/{id}:
+ *   delete:
+ *     summary: Delete ${name} by ID
+ *     description: Deletes a ${name} record by ID.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Record deleted successfully.
+ *       404:
+ *         description: Record not found.
+ */
+router.delete('/:id', deleteByIdController);
 
 export default router;
 `;
 };
 
-const gentsIndex = (names: string[], projectName: string): string => {
-    const imports = names.map(name => `import ${name}Routes from '../src/routes/${name}.routes';`).join('\n');
-    const routes = names.map(name => `app.use('/${name}', ${name}Routes);`).join('\n');
+const genMongooseTSIndex = (names: string[], projectName: string): string => {
+    const imports = names.map(name => `import ${name}Routes from './routes/${name}.routes';`).join('\n');
+    const routes = names.map(name => `app.use('/api/${name}', ${name}Routes);`).join('\n');
 
     return `
 import express from 'express';
 import mongoose from 'mongoose';
+import cors from 'cors';
+import connectDB from './config/db';
+import swaggerDocs from './swagger';
+${imports}
 
 const app = express();
 
+app.use(cors());
 app.use(express.json());
-
-mongoose.set('strictQuery', true);
-mongoose.connect('mongodb://localhost:27017/${projectName}')
-    .then(() => console.log('MongoDB connected'))
-    .catch(err => console.error(err));
-
-${imports}
+swaggerDocs(app);
 
 ${routes}
 
-app.listen(3000, () => {
-    console.log('Server running on port 3000');
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+    await connectDB();
+    console.log(\`Server running on port \${PORT}\`);
 });
 `;
 };
@@ -209,27 +342,44 @@ const genPackageJson = (name: string) => {
         "devDependencies": {
             "@types/cors": "^2.8.17",
             "@types/express": "^5.0.0",
+            "@types/swagger-jsdoc": "^6.0.4",
+            "@types/swagger-ui-express": "^4.1.8",
             "nodemon": "^3.1.7",
             "ts-node": "^10.9.2",
             "typescript": "^5.6.2",
             "mongoose": "^6.1.0"
+
         },
         "dependencies": {
             "cors": "^2.8.5",
             "express": "^4.21.0",
-            "mongoose": "^6.1.0"
+            "mongoose": "^6.1.0",
+            "swagger-jsdoc": "^6.2.8",
+            "swagger-ui-express": "^4.6.3"
         }
     }`;
 };
 
-const generateBat = (name: string) => {
+const genMongooseTSDBConfig = (dbName: string): string => {
     return `
-echo instalando dependencias
-npm install
-echo iniciando servidor
-npm run dev
-    `;
-}
+import mongoose from 'mongoose';
+
+const connectDB = async () => {
+    try {
+        await mongoose.connect('mongodb://localhost:27017/${dbName}', {
+            useNewUrlParser: true,
+            useUnifiedTopology: true,
+        });
+        console.log('MongoDB connected');
+    } catch (error) {
+        console.error('MongoDB connection failed:', error);
+        process.exit(1);
+    }
+};
+
+export default connectDB;
+`;
+};
 
 const gentTsConfig = () => {
     return `
@@ -348,14 +498,95 @@ const gentTsConfig = () => {
     `;
 }
 
+const genSwaggerTs = (models: any[], projectName: string): string => {
+    let content = `
+import swaggerJsdoc from 'swagger-jsdoc';
+import swaggerUi from 'swagger-ui-express';
+
+const options = {
+    definition: {
+        openapi: '3.0.0',
+        info: {
+            title: '${projectName} API Documentation',
+            version: '1.0.0',
+            description: 'API documentation for the ${projectName} project using Sequelize and Express',
+        },
+        servers: [
+            {
+                url: 'http://localhost:3000/api/',
+            },
+        ],
+        components: {
+            schemas: {
+`;
+
+    // Función recursiva para generar propiedades anidadas
+    const generateProperties = (fields: Field[]): string => {
+        let propertiesContent = '';
+        for (const field of fields) {
+            propertiesContent += `                        ${field.name}: {\n`;
+            if (field.type === "object" && field.fields) {
+                // Si el campo es un objeto, generar una estructura anidada
+                propertiesContent += `                            type: 'object',\n`;
+                propertiesContent += `                            properties: {\n`;
+                propertiesContent += generateProperties(field.fields);
+                propertiesContent += `                            },\n`;
+            } else {
+                // Si el campo es primitivo
+                propertiesContent += `                            type: '${field.type.toLowerCase()}',\n`;
+                propertiesContent += `                            description: 'Campo ${field.name}',\n`;
+                if (field.references) {
+                    propertiesContent += `                            ref: '${field.references.model}',\n`;
+                }
+            }
+            propertiesContent += `                        },\n`;
+        }
+        return propertiesContent;
+    };
+
+    // Agregar los modelos al esquema de Swagger
+    for (const model of models) {
+        if (!model.name || !model.fields) {
+            console.error(`Modelo inválido: falta 'name' o 'fields'`);
+            continue;
+        }
+
+        content += `                ${model.name}: {\n`;
+        content += `                    type: 'object',\n`;
+        content += `                    properties: {\n`;
+        content += generateProperties(model.fields);
+        content += `                    },\n`;
+        content += `                },\n`;
+    }
+
+    content += `            },\n`;
+    content += `        },\n`;
+    content += `    },\n`;
+    content += `    apis: ['./src/routes/*.ts'],\n`;
+    content += `};\n\n`;
+
+    // Función para inicializar Swagger
+    content += `const swaggerDocs = (app: any) => {\n`;
+    content += `    const swaggerSpec = swaggerJsdoc(options);\n`;
+    content += `    app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));\n`;
+    content += `};\n\n`;
+
+    content += `export default swaggerDocs;\n`;
+
+    return content;
+};
+
+
 export default {
-    gentsModel,
-    gentsServices,
-    gentsModelInterface,
-    gentsControllers,
-    gentsRoutes,
-    gentsIndex,
+    genMongooseTSModel,
+    genMongooseTSService,
+    genMongooseTSInterface,
+    genMongooseTSController,
+    genMongooseTSRoutes,
+    genMongooseTSIndex,
     genPackageJson,
-    generateBat,
-    gentTsConfig
+    genMongooseTSDBConfig,
+    gentTsConfig,
+    genSwaggerTs
+
 };

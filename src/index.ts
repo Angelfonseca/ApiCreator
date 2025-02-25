@@ -15,9 +15,9 @@ app.set('views', path.join(__dirname, '../views'));
 app.get('/', (req, res) => {
   res.render('welcome');
 });
-
+app.use('/public', express.static(path.join(__dirname, '..','public')));
 app.get('/generator', (req, res) => {
-  res.render('index');
+  res.render('iaChat');
 });
 
 app.use('/api', route);

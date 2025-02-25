@@ -3,303 +3,614 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>CRUD API TS Creator</title>
+    <title>API Generator</title>
+    <!-- Bootstrap CSS -->
+    <link
+      href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
     <style>
-      body {
-        font-family: Arial, sans-serif;
-        margin: 0;
-        background-color: #f4f4f4;
-        color: #333;
+      .ai-chat-bar {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        z-index: 1000;
       }
-      .field-group {
-        margin-top: 15px;
-        padding: 15px; /* Aumenta el padding para dar más espacio */
-        border: 1px solid #e0e0e0;
-        border-radius: 4px;
-        background-color: #f9f9f9;
-      }
-
-      h1,
-      h2,
-      h3,
-      h4,
-      h5,
-      h6 {
-        margin: 0;
-        padding: 10px 0;
-      }
-
-      .container {
-        max-width: 600px;
-        margin: 20px auto;
-        background: white;
-        padding: 20px;
-        border-radius: 8px;
-        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-      }
-
-      .form-group {
-        margin-bottom: 20px;
-      }
-
-      label {
-        display: block;
-        margin-bottom: 5px;
-        font-weight: bold;
-      }
-
-      input[type="text"],
-      input[type="number"],
-      select {
-        width: 100%;
-        padding: 8px;
-        border: 1px solid #ccc;
-        border-radius: 4px;
-        font-size: 14px;
-        box-sizing: border-box;
-      }
-
-      button {
-        background-color: #28a745;
-        color: white;
-        padding: 8px 12px;
-        border: none;
-        border-radius: 4px;
+      .ai-toggle-button {
+        background-color: #007bff;
+        border-radius: 50%;
+        width: 50px;
+        height: 50px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
         cursor: pointer;
-        font-size: 14px;
-        margin-top: 10px;
-        transition: background-color 0.3s;
-        width: auto; /* Ajustar el ancho de los botones */
       }
-
-      button:hover {
-        background-color: #218838;
+      .ai-icon {
+        width: 30px;
+        height: 30px;
       }
-
-      .field-group {
-        margin-top: 15px;
+      .ai-chat-content {
+        background-color: white;
+        border: 1px solid #ddd;
+        border-radius: 10px;
+        width: 300px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      }
+      .ai-chat-header {
+        background-color: #007bff;
+        color: white;
         padding: 10px;
-        border: 1px solid #e0e0e0;
-        border-radius: 4px;
-        background-color: #f9f9f9;
+        border-top-left-radius: 10px;
+        border-top-right-radius: 10px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
       }
-
-      .remove-button {
-        background-color: #dc3545;
+      .close-button {
+        background: none;
+        border: none;
+        color: white;
+        font-size: 20px;
+        cursor: pointer;
       }
-
-      .remove-button:hover {
-        background-color: #c82333;
+      .ai-chat-body {
+        max-height: 300px;
+        overflow-y: auto;
+        padding: 10px;
       }
-
-      /* Media Queries for Mobile */
-      @media (max-width: 600px) {
-        .container {
-          padding: 15px;
-        }
-
-        button {
-          width: 100%;
-        }
-
-        .form-group {
-          margin-bottom: 15px;
-        }
-
-        .field-group {
-          margin-top: 10px;
-          padding: 8px;
-        }
+      .chat-message {
+        margin-bottom: 10px;
+      }
+      .chat-message.user {
+        text-align: right;
+      }
+      .chat-message.ai {
+        text-align: left;
+      }
+      .message-content {
+        background-color: #f1f1f1;
+        padding: 10px;
+        border-radius: 10px;
+        display: inline-block;
+        max-width: 70%;
+      }
+      .message-text {
+        font-size: 14px;
+      }
+      .timestamp {
+        font-size: 12px;
+        color: #888;
+      }
+      .input-container {
+        display: flex;
+        padding: 10px;
+      }
+      .input {
+        flex: 1;
+        resize: none;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        margin-right: 10px;
+      }
+      .send-btn {
+        background-color: #007bff;
+        border: none;
+        color: white;
+        padding: 10px 15px;
+        border-radius: 5px;
+        cursor: pointer;
+      }
+      .send-btn:hover {
+        background-color: #0056b3;
       }
     </style>
   </head>
   <body>
-    <div class="container">
-      <h1>JS and TS API CRUD Creator!</h1>
-      <p>Welcome to my API generator.</p>
-
-      <h2>Project Configuration Form</h2>
+    <div class="container mt-5">
+      <h1>CRUD API TS Creator</h1>
       <form id="projectForm">
         <div class="form-group">
           <label for="projectName">Project Name:</label>
-          <input type="text" id="projectName" name="projectName" required />
+          <input
+            type="text"
+            class="form-control"
+            id="projectName"
+            placeholder="Enter project name"
+            required
+          />
+          <div class="invalid-feedback">Project name is required.</div>
         </div>
-
         <div class="form-group">
-          <label for="projectType">Select Project Type:</label>
-          <select id="projectType" name="projectType" required>
-            <option value="javascript">JavaScript</option>
-            <option value="typescript">TypeScript</option>
-          </select>
+          <label>Select Project Type:</label>
+          <div class="form-check">
+            <input
+              class="form-check-input"
+              type="radio"
+              name="projectType"
+              id="javascript"
+              value="JavaScript"
+              required
+            />
+            <label class="form-check-label" for="javascript">
+              JavaScript
+            </label>
+          </div>
+          <div class="form-check">
+            <input
+              class="form-check-input"
+              type="radio"
+              name="projectType"
+              id="typescript"
+              value="TypeScript"
+              required
+            />
+            <label class="form-check-label" for="typescript">
+              TypeScript
+            </label>
+          </div>
         </div>
-
-        <div id="modelsContainer">
-          <h3>Models</h3>
-          <!-- Models will be dynamically added here -->
+        <div class="form-group">
+          <label>Select Database Type:</label>
+          <div class="form-check">
+            <input
+              class="form-check-input"
+              type="radio"
+              name="dbType"
+              id="postgresql"
+              value="pg"
+              required
+            />
+            <label class="form-check-label" for="postgresql">
+              PostgreSQL
+            </label>
+          </div>
+          <div class="form-check">
+            <input
+              class="form-check-input"
+              type="radio"
+              name="dbType"
+              id="mongodb"
+              value="mdb"
+              required
+            />
+            <label class="form-check-label" for="mongodb"> MongoDB </label>
+          </div>
         </div>
-
-        <button type="button" onclick="addModel()">Add Model</button>
-        <button type="submit">Submit</button>
+        <div class="form-group">
+          <h5>Models</h5>
+          <button
+            type="button"
+            class="btn btn-primary mb-3"
+            onclick="addModelForm()"
+          >
+            Add Model
+          </button>
+          <div id="modelsContainer">
+            <!-- Model forms will be added here -->
+          </div>
+        </div>
+        <button type="submit" class="btn btn-success">Submit</button>
       </form>
+      <div id="jsonViewer" style="display: none">
+        <h5>JSON Viewer</h5>
+        <pre id="jsonContent"></pre>
+      </div>
     </div>
+
+    <div class="ai-chat-bar" id="ai-chat-bar">
+      <div class="ai-toggle-button" onclick="toggleVisibility()">
+        <img src="/public/AIIcon.png" alt="AI Icon" class="ai-icon" />
+      </div>
+
+      <div id="ai-chat-content" style="display: none">
+        <div class="ai-chat-header">
+          <h3>Chat with AI</h3>
+          <button class="close-button" onclick="toggleVisibility()">
+            &times;
+          </button>
+        </div>
+
+        <div class="ai-chat-body" id="chatContainer">
+          <div id="messages">
+            <!-- Mensajes se insertarán aquí -->
+          </div>
+        </div>
+
+        <div class="input-container">
+          <textarea
+            id="aiPrompt"
+            placeholder="Write a message..."
+            class="input"
+            rows="1"
+          ></textarea>
+          <button id="sendBtn" class="send-btn" onclick="sendPromptToBackend()">
+            Send
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bootstrap JS and dependencies -->
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.3/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+
     <script>
-      let modelCount = 0;
-    
-      function addModel() {
-        modelCount++;
-        const modelDiv = document.createElement("div");
-        modelDiv.className = "field-group";
-        modelDiv.id = `model-${modelCount}`;
-    
-        modelDiv.innerHTML = `
-          <h4>Model ${modelCount}</h4>
-          <label for="modelName-${modelCount}">Model Name:</label>
-          <input type="text" id="modelName-${modelCount}" name="modelName-${modelCount}" required>
-          <div id="fieldsContainer-${modelCount}">
-            <h5>Fields</h5>
-          </div>
-          <button type="button" onclick="addField(${modelCount})">Add Field</button>
-          <button type="button" onclick="removeModel(${modelCount})" class="remove-button">Remove Model</button>
-        `;
-    
-        document.getElementById("modelsContainer").appendChild(modelDiv);
+      let isVisible = false;
+
+      function toggleVisibility() {
+        isVisible = !isVisible;
+        document.getElementById("ai-chat-content").style.display = isVisible
+          ? "block"
+          : "none";
       }
-    
-      function addField(modelId) {
-        const fieldCount =
-          document.querySelectorAll(`#fieldsContainer-${modelId} .field-group`).length + 1;
-    
-        const fieldDiv = document.createElement("div");
-        fieldDiv.className = "field-group";
-        fieldDiv.innerHTML = `
-          <h6>Field ${fieldCount}</h6>
-          <label for="fieldName-${modelId}-${fieldCount}">Field Name:</label>
-          <input type="text" id="fieldName-${modelId}-${fieldCount}" name="fieldName-${modelId}-${fieldCount}" required>
-          
-          <label for="fieldType-${modelId}-${fieldCount}">Field Type:</label>
-          <select id="fieldType-${modelId}-${fieldCount}" name="fieldType-${modelId}-${fieldCount}" required onchange="handleFieldType(${modelId}, ${fieldCount})">
-            <option value="number">Number</option>
-            <option value="string">String</option>
-            <option value="array">Array</option>
-            <option value="object">Object</option>
-            <option value="boolean">Boolean</option>
-            <option value="date">Date</option>
-          </select>
-          
-          <div id="refContainer-${modelId}-${fieldCount}" style="display: none;">
-            <label for="fieldRef-${modelId}-${fieldCount}">Field Reference (required for Object):</label>
-            <input type="text" id="fieldRef-${modelId}-${fieldCount}" name="fieldRef-${modelId}-${fieldCount}" placeholder="Reference model name">
-          </div>
-          
-          <label for="fieldRequired-${modelId}-${fieldCount}">Required:</label>
-          <input type="checkbox" id="fieldRequired-${modelId}-${fieldCount}" name="fieldRequired-${modelId}-${fieldCount}">
-          <br>
-          <button type="button" onclick="removeField(this)" class="remove-button">Remove Field</button>
-        `;
-    
-        document.getElementById(`fieldsContainer-${modelId}`).appendChild(fieldDiv);
-      }
-    
-      function handleFieldType(modelId, fieldCount) {
-        const fieldType = document.getElementById(`fieldType-${modelId}-${fieldCount}`).value;
-        const refContainer = document.getElementById(`refContainer-${modelId}-${fieldCount}`);
-    
-        if (fieldType === "object") {
-          refContainer.style.display = "block";
-          document.getElementById(`fieldRef-${modelId}-${fieldCount}`).setAttribute("required", "true");
-        } else {
-          refContainer.style.display = "none";
-          document.getElementById(`fieldRef-${modelId}-${fieldCount}`).removeAttribute("required");
+
+      async function sendPromptToBackend() {
+        const aiPrompt = document.getElementById("aiPrompt").value;
+        if (!aiPrompt.trim()) return;
+        const dbType =
+          document.querySelector('input[name="dbType"]:checked')?.value ||
+          "unknown";
+        const timestamp = new Date().toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+        const userMessage = { text: aiPrompt, user: true, timestamp };
+        addMessage(userMessage);
+        document.getElementById("aiPrompt").value = "";
+        scrollToBottom();
+        try {
+          console.log("Sending request to AI:", {
+            userPrompt: aiPrompt,
+            db: dbType,
+          });
+          const response = await fetch("/api/ai", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userPrompt: aiPrompt, db: dbType }),
+          });
+          if (!response.ok) {
+            throw new Error(`API responded with status: ${response.status}`);
+          }
+          const responseText = await response.text();
+          console.log("Response received:", responseText);
+          const data = JSON.parse(responseText);
+          if (!data.response.text || !data.response.json) {
+            throw new Error("Invalid response format from API");
+          }
+          const aiTextMessage = {
+            text: data.response.text,
+            user: false,
+            timestamp,
+          };
+          addMessage(aiTextMessage);
+          compareAndUpdateJson(data.response.json);
+          scrollToBottom();
+        } catch (error) {
+          console.error("Error parsing JSON:", error);
+          addMessage({
+            text: "Error processing request",
+            user: false,
+            timestamp,
+          });
         }
       }
-    
-      function removeField(button) {
-        const fieldGroup = button.parentNode;
-        fieldGroup.parentNode.removeChild(fieldGroup);
+
+      function addMessage(message) {
+        const messagesContainer = document.getElementById("messages");
+        const messageElement = document.createElement("div");
+        messageElement.className = `chat-message ${
+          message.user ? "user" : "ai"
+        }`;
+        messageElement.innerHTML = `
+                      <div class="message-content">
+                          <div class="message-text">${message.text}</div>
+                          <small class="timestamp">${message.timestamp}</small>
+                      </div>
+                  `;
+        messagesContainer.appendChild(messageElement);
       }
-    
-      function removeModel(modelId) {
-        const modelDiv = document.getElementById(`model-${modelId}`);
-        modelDiv.parentNode.removeChild(modelDiv);
+
+      function scrollToBottom() {
+        const container = document.getElementById("chatContainer");
+        if (container) container.scrollTop = container.scrollHeight;
       }
-    
-      document.getElementById("projectForm").addEventListener("submit", function (event) {
-        event.preventDefault();
-    
-        const projectName = document.getElementById("projectName").value;
-        const projectType = document.getElementById("projectType").value;
-        const models = [];
-    
-        for (let i = 1; i <= modelCount; i++) {
-          const modelDiv = document.getElementById(`model-${i}`);
-          if (modelDiv) {
-            const modelName = document.getElementById(`modelName-${i}`).value;
+      function updateModelWithJson(jsonData) {
+        const modelsContainer = document.getElementById("modelsContainer");
+        modelsContainer.innerHTML = ""; // Clear existing models
+        jsonData.modelos.forEach((model) => {
+          const modelForm = document.createElement("div");
+          modelForm.className = "card mb-3";
+          modelForm.innerHTML = `
+      <div class="card-header">
+        <h5>${model.name}</h5>
+        <button type="button" class="btn btn-danger float-right" onclick="removeModelForm(this)">Delete Model</button>
+      </div>
+      <div class="card-body">
+        <div class="form-group">
+          <label>Model Name:</label>
+          <input type="text" class="form-control" value="${model.name}" required>
+        </div>
+      </div>
+    `;
+          modelsContainer.appendChild(modelForm);
+          const fieldsContainer = document.createElement("div");
+          fieldsContainer.className = "form-group";
+          modelForm.querySelector(".card-body").appendChild(fieldsContainer);
+          model.fields.forEach((field) => {
+            const fieldForm = document.createElement("div");
+            fieldForm.className = "card mb-2";
+            fieldForm.innerHTML = `
+        <div class="card-body">
+          <div class="form-group">
+            <label>Field Name:</label>
+            <input type="text" class="form-control" value="${
+              field.name
+            }" required>
+          </div>
+          <div class="form-group">
+            <label>Field Type:</label>
+            <select class="form-control">
+              <option value="${field.type}" selected>${field.type}</option>
+            </select>
+          </div>
+          <div class="form-group form-check">
+            <input type="checkbox" class="form-check-input" ${
+              field.required ? "checked" : ""
+            }>
+            <label class="form-check-label">Required</label>
+          </div>
+          <button type="button" class="btn btn-danger float-right" onclick="removeFieldForm(this)">Delete Field</button>
+        </div>
+      `;
+            fieldsContainer.appendChild(fieldForm);
+          });
+        });
+
+        // Update JSON viewer
+        const jsonViewer = document.getElementById("jsonViewer");
+        const jsonContent = document.getElementById("jsonContent");
+        jsonContent.textContent = JSON.stringify(jsonData, null, 2);
+        jsonViewer.style.display = "block";
+      }
+
+      function addModelForm() {
+        const modelsContainer = document.getElementById("modelsContainer");
+        const modelIndex = modelsContainer.children.length + 1;
+        const modelForm = document.createElement("div");
+        modelForm.className = "card mb-3";
+        modelForm.innerHTML = `
+          <div class="card-header">
+              <h5>Model ${modelIndex}</h5>
+              <button type="button" class="btn btn-danger float-right" onclick="removeModelForm(this)">Delete Model</button>
+          </div>
+          <div class="card-body">
+              <div class="form-group">
+            <label for="modelName${modelIndex}">Model Name:</label>
+            <input type="text" class="form-control" id="modelName${modelIndex}" placeholder="Enter model name" required>
+            <div class="invalid-feedback">
+                Model name is required.
+            </div>
+              </div>
+              <div class="form-group">
+            <h6>Fields</h6>
+            <div id="fieldsContainer${modelIndex}">
+                <!-- Fields will be added here -->
+            </div>
+            <button type="button" class="btn btn-secondary mb-3" onclick="addFieldForm(${modelIndex})">Add Field</button>
+              </div>
+          </div>
+            `;
+        modelsContainer.appendChild(modelForm);
+      }
+
+      function removeModelForm(button) {
+        button.parentElement.parentElement.remove();
+      }
+      function compareAndUpdateJson(newJson) {
+        const currentJson = JSON.parse(
+          document.getElementById("jsonContent").textContent
+        );
+        // Implement comparison logic here
+        // For example, you can compare models and fields and update the current JSON accordingly
+        const updatedJson = { ...currentJson };
+
+        newJson.models.forEach((newModel) => {
+          const existingModel = updatedJson.models.find(
+            (model) => model.name === newModel.name
+          );
+          if (existingModel) {
+            // Update existing model
+            existingModel.fields = newModel.fields;
+          } else {
+            // Add new model
+            updatedJson.models.push(newModel);
+          }
+        });
+
+        updateModelWithJson(updatedJson);
+      }
+
+      function addFieldForm(modelIndex) {
+        const fieldsContainer = document.getElementById(
+          `fieldsContainer${modelIndex}`
+        );
+        const fieldIndex = fieldsContainer.children.length + 1;
+        const fieldForm = document.createElement("div");
+        fieldForm.className = "card mb-2";
+        fieldForm.innerHTML = `
+                      <div class="card-body">
+                          <div class="form-group">
+                              <label for="fieldName${modelIndex}-${fieldIndex}">Field Name:</label>
+                              <input type="text" class="form-control" id="fieldName${modelIndex}-${fieldIndex}" placeholder="Enter field name" required>
+                              <div class="invalid-feedback">
+                                  Field name is required.
+                              </div>
+                          </div>
+                          <div class="form-group">
+                              <label for="fieldType${modelIndex}-${fieldIndex}">Field Type:</label>
+                              <select class="form-control" id="fieldType${modelIndex}-${fieldIndex}">
+                                  <option value="String">String</option>
+                                  <option value="Number">Number</option>
+                                  <option value="Object">Object</option>
+                                  <option value="Boolean">Boolean</option>
+                                  <option value="Array">Array</option>
+                              </select>
+                          </div>
+                          <div class="form-group form-check">
+                              <input type="checkbox" class="form-check-input" id="fieldRequired${modelIndex}-${fieldIndex}">
+                              <label class="form-check-label" for="fieldRequired${modelIndex}-${fieldIndex}">
+                                  Required
+                              </label>
+                          </div>
+                          <div class="form-group">
+                              <h6>Subfields</h6>
+                              <div id="subfieldsContainer${modelIndex}-${fieldIndex}">
+                                  <!-- Subfields will be added here -->
+                              </div>
+                              <button type="button" class="btn btn-secondary mb-3" onclick="addSubfieldForm(${modelIndex}, ${fieldIndex})">Add Subfield</button>
+                          </div>
+                          <button type="button" class="btn btn-danger float-right" onclick="removeFieldForm(this)">Delete Field</button>
+                      </div>
+                  `;
+        fieldsContainer.appendChild(fieldForm);
+      }
+
+      function removeFieldForm(button) {
+        button.parentElement.parentElement.remove();
+      }
+
+      function addSubfieldForm(modelIndex, fieldIndex) {
+        const subfieldsContainer = document.getElementById(
+          `subfieldsContainer${modelIndex}-${fieldIndex}`
+        );
+        const subfieldIndex = subfieldsContainer.children.length + 1;
+        const subfieldForm = document.createElement("div");
+        subfieldForm.className = "form-inline mb-2";
+        subfieldForm.innerHTML = `
+                      <div class="form-group mr-3">
+                          <label for="subfieldName${modelIndex}-${fieldIndex}-${subfieldIndex}" class="mr-2">Subfield Name:</label>
+                          <input type="text" class="form-control" id="subfieldName${modelIndex}-${fieldIndex}-${subfieldIndex}" placeholder="Enter subfield name" required>
+                          <div class="invalid-feedback">
+                              Subfield name is required.
+                          </div>
+                      </div>
+                      <div class="form-group mr-3">
+                          <label for="subfieldType${modelIndex}-${fieldIndex}-${subfieldIndex}" class="mr-2">Field Type:</label>
+                          <select class="form-control" id="subfieldType${modelIndex}-${fieldIndex}-${subfieldIndex}">
+                              <option value="String">String</option>
+                              <option value="Number">Number</option>
+                              <option value="Object">Object</option>
+                              <option value="Boolean">Boolean</option>
+                              <option value="Array">Array</option>
+                          </select>
+                      </div>
+                      <div class="form-group form-check mr-3">
+                          <input type="checkbox" class="form-check-input" id="subfieldRequired${modelIndex}-${fieldIndex}-${subfieldIndex}">
+                          <label class="form-check-label" for="subfieldRequired${modelIndex}-${fieldIndex}-${subfieldIndex}">
+                              Required
+                          </label>
+                      </div>
+                      <button type="button" class="btn btn-danger" onclick="removeSubfieldForm(this)">Delete Subfield</button>
+                  `;
+        subfieldsContainer.appendChild(subfieldForm);
+      }
+
+      function removeSubfieldForm(button) {
+        button.parentElement.remove();
+      }
+
+      document
+        .getElementById("projectForm")
+        .addEventListener("submit", async function (event) {
+          event.preventDefault();
+
+          const projectName = document.getElementById("projectName").value;
+          const projectType = document.querySelector(
+            'input[name="projectType"]:checked'
+          ).value;
+          const dbType = document.querySelector(
+            'input[name="dbType"]:checked'
+          ).value;
+          const models = [];
+
+          const modelForms = document.querySelectorAll(
+            "#modelsContainer .card"
+          );
+          modelForms.forEach((modelForm) => {
+            const modelName = modelForm.querySelector(
+              'input[id^="modelName"]'
+            ).value;
             const fields = [];
-            const fieldGroups = modelDiv.querySelectorAll(".field-group");
-    
-            fieldGroups.forEach((fieldGroup) => {
-              const fieldName = fieldGroup.querySelector(`input[name^="fieldName"]`).value;
-              const fieldType = fieldGroup.querySelector(`select[name^="fieldType"]`).value;
-              const fieldRequired = fieldGroup.querySelector(`input[type="checkbox"]`).checked;
-    
-              let fieldRef = "";
-              if (fieldType === "object") {
-                fieldRef = fieldGroup.querySelector(`input[name^="fieldRef"]`).value.trim();
-                if (!fieldRef) {
-                  alert(`Field "${fieldName}" in model "${modelName}" requires a reference model.`);
-                  return;
-                }
-              }
-    
+            const fieldForms = modelForm.querySelectorAll(
+              '.card[id^="fieldsContainer"] .card'
+            );
+            fieldForms.forEach((fieldForm) => {
+              const fieldName = fieldForm.querySelector(
+                'input[id^="fieldName"]'
+              ).value;
+              const fieldType = fieldForm.querySelector(
+                'select[id^="fieldType"]'
+              ).value;
+              const fieldRequired = fieldForm.querySelector(
+                'input[id^="fieldRequired"]'
+              ).checked;
+              const subfields = [];
+              const subfieldForms = fieldForm.querySelectorAll(
+                '.form-inline[id^="subfieldsContainer"]'
+              );
+              subfieldForms.forEach((subfieldForm) => {
+                const subfieldName = subfieldForm.querySelector(
+                  'input[id^="subfieldName"]'
+                ).value;
+                const subfieldType = subfieldForm.querySelector(
+                  'select[id^="subfieldType"]'
+                ).value;
+                const subfieldRequired = subfieldForm.querySelector(
+                  'input[id^="subfieldRequired"]'
+                ).checked;
+                subfields.push({
+                  name: subfieldName,
+                  type: subfieldType,
+                  required: subfieldRequired,
+                });
+              });
               fields.push({
                 name: fieldName,
                 type: fieldType,
-                ...(fieldRef && { ref: fieldRef }),
                 required: fieldRequired,
+                subfields: subfields,
               });
             });
-    
-            models.push({
-              name: modelName,
-              fields: fields,
-            });
-          }
-        }
-    
-        if (models.length === 0) {
-          alert("Please add at least one model.");
-          return;
-        }
-    
-        const formData = {
-          projectName: projectName,
-          projectType: projectType,
-          models: models,
-        };
-    
-        const route = projectType === "javascript" ? "/api/generatejs" : "/api/generate";
-    
-        fetch(route, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(formData),
-        })
-          .then((response) => response.blob())
-          .then((blob) => {
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = `${projectName}.zip`;
-            a.click();
-            URL.revokeObjectURL(url);
-          })
-          .catch((error) => {
-            console.error("Error:", error);
+            models.push({ name: modelName, fields: fields });
           });
-      });
+
+          const endpoint = `/api/generate${dbType.toLowerCase()}${projectType.toLowerCase()}`;
+
+          try {
+            const response = await fetch(endpoint, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                projectName,
+                projectType,
+                dbType,
+                models,
+              }),
+            });
+
+            const data = await response.json();
+            alert("Project generated successfully!");
+            console.log(data);
+          } catch (error) {
+            console.error("Error generating project:", error);
+            alert("Error generating project. Please try again.");
+          }
+        });
     </script>
-    
   </body>
 </html>

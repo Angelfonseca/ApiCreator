@@ -48,7 +48,7 @@ const genControllers = (modelos: any[], dir: string): void => {
 
         try {
             const name = modelo.name;
-            const controllerContent = generatorService.genJsController(name);
+            const controllerContent = generatorService.genMongooseJSController(name);
             const filePath = path.join(outputDir, `${name}.controller.js`);
             fs.writeFileSync(filePath, controllerContent);
             console.log(`Controlador ${name} generado en ${filePath}`);
@@ -70,7 +70,7 @@ const genRoutes = (modelos: any[], dir: string): void => {
 
         try {
             const { name } = modelo;
-            const routesContent = generatorService.genJsRoutes(name);
+            const routesContent = generatorService.genMongooseJSRoutes(name);
             const filePath = path.join(outputDir, `${name}.routes.js`);
             fs.writeFileSync(filePath, routesContent);
             console.log(`Rutas ${name} generadas en ${filePath}`);
@@ -83,7 +83,7 @@ const genRoutes = (modelos: any[], dir: string): void => {
 const genIndex = (modelos: any[], dir: string, projectName: string): void => {
     const outputDir = path.join(dir, 'index.js');
     const names = modelos.map(modelo => modelo.name);
-    const indexContent = generatorService.genJsIndex(names, projectName);
+    const indexContent = generatorService.genMongooseJSIndex(names, projectName);
     fs.writeFileSync(outputDir, indexContent);
     console.log(`Index generado en ${outputDir}`);
 };
@@ -119,6 +119,7 @@ const createJSProject = async (req: Request, res: Response): Promise<void> => {
         genControllers(modelos, srcDir);
         genRoutes(modelos, srcDir);
         genIndex(modelos, srcDir, projectName);
+        genJsSwagger(modelos, srcDir, projectName);
 
         const packageJsonContent = genPackageJson(projectName);
         fs.writeFileSync(path.join(projectDir, 'package.json'), packageJsonContent);
@@ -171,7 +172,7 @@ const genJsService = (modelos: any[], dir: string): void => {
 
         try {
             const name = modelo.name;
-            const serviceContent = generatorService.genJsService(name);
+            const serviceContent = generatorService.genMongooseJSService(name);
             const filePath = path.join(outputDir, `${name}.service.js`);
             fs.writeFileSync(filePath, serviceContent);
             console.log(`Servicio ${name} generado en ${filePath}`);
@@ -180,6 +181,18 @@ const genJsService = (modelos: any[], dir: string): void => {
         }
     }
 };
+
+const genJsSwagger = (modelos: any[], dir: string, name: string): void => {
+    const outputDir = path.join(dir);
+    ensureDirExists(outputDir);
+    const swaggerContent = generatorService.genSwaggerJs(modelos, name);
+    const filePath = path.join(outputDir, 'swagger.js');
+    fs.writeFileSync
+    (filePath, swaggerContent);
+    console.log(`Swagger generado en ${filePath}`);
+}
+
+
 
 export default {
     createJSProject
