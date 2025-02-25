@@ -47,7 +47,9 @@ npm start
 | POST   | /api/generatemdbjs    | Genera API en JavaScript con MongoDB     |
 | POST   | /api/generatepgjs     | Genera API en JavaScript con PostgreSQL  |
 | POST   | /api/generatepgts     | Genera API en TypeScript con PostgreSQL  |
-| POST   | /api/ai               | Genera API en TypeScript con PostgreSQL  |
+| POST   | /api/ai               | Genera la conexión con IA para crear mo  |
+                                   delos de datos basado en prompts
+                                  
 
 📌 Cada endpoint recibe un JSON con la estructura del esquema de la API y devuelve un archivo .zip.
 
