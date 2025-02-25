@@ -16,7 +16,14 @@ Este proyecto es una aplicación web que permite generar APIs automáticamente e
 ```bash
 git clone https://github.com/Angelfonseca/ApiCreator.git
 cd ApiCreator
-```
+``
+
+### 🛠️ Configuración del archivo de variables de entorno  
+
+Antes de ejecutar el proyecto, es **necesario** configurar un archivo `.env` en la raíz del proyecto con la siguiente variable:  
+
+```plaintext
+AI_API_KEY=TU_CLAVE_DE_API
 
 ### 2️⃣ Instalar dependencias  
 ```bash
