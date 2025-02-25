@@ -28,7 +28,7 @@ npm install
 Antes de ejecutar el proyecto, es **necesario** configurar un archivo `.env` en la raíz del proyecto con la siguiente variable:  
 
 ```plaintext
-AI_API_KEY=TU_CLAVE_DE_API
+AI_API_KEY=sk-proj-
 ```
 
 ### 3️⃣ Iniciar el servidor  
