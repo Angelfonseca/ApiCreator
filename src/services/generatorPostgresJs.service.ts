@@ -1,12 +1,20 @@
 import fs from 'fs';
 import path from 'path';
-
-interface Field {
+import { DataTypes } from 'sequelize';
+export interface Field {
     name: string;
-    type: string; // Ejemplo: 'STRING', 'INTEGER', 'BOOLEAN', etc.
-    allowNull?: boolean; // Si el campo puede ser nulo
-    defaultValue?: any; // Valor por defecto
-    references?: { model: string; key: string }; // Para relaciones
+    type: keyof typeof DataTypes; // Evita valores inválidos
+    allowNull?: boolean;
+    defaultValue?: any;
+    unique?: boolean;
+    validate?: Record<string, any>;
+    length?: number;
+    references?: { model: string; key: string }; // Relaciones belongsTo
+    hasMany?: string; // Relación hasMany
+    hasManyForeignKey?: string;
+    hasOne?: string; // Relación hasOne
+    hasOneForeignKey?: string;
+    indexes?: boolean; // Para optimizar consultas
 }
 
 interface DbConfig {
@@ -20,76 +28,109 @@ interface DbConfig {
 const capitalize = (str: string) => str.charAt(0).toUpperCase() + str.slice(1);
 
 const genJsModel = (name: string, fields: Field[]) => {
-    let content = `const { DataTypes } = require('sequelize');\n\n`;
-    for (const field of fields) {
-        if (field.references) {
-            content += `const ${field.references.model} = require('./${field.references.model}.model');\n`;
-        }
-    }
+    let content = `const { DataTypes, Model } = require('sequelize');\n\n`;
     content += `module.exports = (sequelize) => {\n`;
-    content += `  const ${capitalize(name)} = sequelize.define('${name}', {\n`;
+    content += `  class ${capitalize(name)} extends Model {}\n\n`;
+    content += `  ${capitalize(name)}.init({\n`;
     content += `    id: {\n`;
     content += `      type: DataTypes.INTEGER,\n`;
     content += `      primaryKey: true,\n`;
     content += `      autoIncrement: true,\n`;
     content += `    },\n`;
+
     for (const field of fields) {
-        if (field.name === 'id') continue; // Evitar duplicar el campo 'id'
+        if (field.name === 'id') continue;
         content += `    ${field.name}: {\n`;
-        content += `      type: DataTypes.${field.type},\n`;
-        if (field.allowNull !== undefined) {
-            content += `      allowNull: ${field.allowNull},\n`;
-        }
-        if (field.defaultValue !== undefined) {
-            content += `      defaultValue: ${JSON.stringify(field.defaultValue)},\n`;
-        }
-        if (field.references) {
-            content += `      references: {\n`;
-            content += `        model: ${field.references.model}(sequelize),\n`;
-            content += `        key: '${field.references.key}'\n`;
-            content += `      },\n`;
-        }
+        content += `      type: DataTypes.${field.type}${field.length ? `(${field.length})` : ''},\n`;
+        if (field.allowNull !== undefined) content += `      allowNull: ${field.allowNull},\n`;
+        if (field.defaultValue !== undefined) content += `      defaultValue: ${JSON.stringify(field.defaultValue)},\n`;
+        if (field.unique) content += `      unique: true,\n`;
+        if (field.validate) content += `      validate: ${JSON.stringify(field.validate)},\n`;
         content += `    },\n`;
     }
+
     content += `  }, {\n`;
+    content += `    sequelize,\n`;
+    content += `    modelName: '${name}',\n`;
     content += `    timestamps: true,\n`;
     content += `  });\n\n`;
+
+    if (fields.some(field => field.references || field.hasMany || field.hasOne)) {
+        content += `  ${capitalize(name)}.associate = (models) => {\n`;
+        for (const field of fields) {
+            if (field.references) {
+                content += `    ${capitalize(name)}.belongsTo(models.${capitalize(field.references.model)}, {\n`;
+                content += `      foreignKey: '${field.name}',\n`;
+                content += `    });\n`;
+            }
+            if (field.hasMany) {
+                content += `    ${capitalize(name)}.hasMany(models.${capitalize(field.hasMany)}, {\n`;
+                content += `      foreignKey: '${field.hasManyForeignKey || `${name}Id`}',\n`;
+                content += `    });\n`;
+            }
+            if (field.hasOne) {
+                content += `    ${capitalize(name)}.hasOne(models.${capitalize(field.hasOne)}, {\n`;
+                content += `      foreignKey: '${field.hasOneForeignKey || `${name}Id`}',\n`;
+                content += `    });\n`;
+            }
+        }
+        content += `  };\n\n`;
+    }
+
     content += `  return ${capitalize(name)};\n`;
     content += `};\n`;
 
     return content;
 };
 
-const genJsService = (name: string) => {
+
+
+const genJsService = (name: string, populate: string[] = []) => {
     const capitalizedName = capitalize(name);
+    const names = populate.map(capitalize);
+
+    let imports = populate.map((p, i) => `const ${names[i]} = require('../models/${p}.model');`).join('\n');
+
+    let includeOption = populate.length ? `include: [${names.join(', ')}],` : '';
 
     let content = `
 const { ${capitalizedName} } = require('../models/${name}.model');
+${imports}
+`;
 
-const getAll = async (${capitalizedName}, options = {}) => {
+    content += `
+// Obtener todos los registros con paginación y filtros
+const getAll = async (options = {}) => {
     try {
+        const { page = 1, limit = 10, filters = {}, order = [['createdAt', 'DESC']] } = options;
         return await ${capitalizedName}.findAll({
-            ...options,
-            order: options.order || [['createdAt', 'DESC']]
+            where: filters,
+            limit,
+            offset: (page - 1) * limit,
+            order,
+            ${includeOption}
         });
     } catch (error) {
         throw new Error(\`Error fetching ${capitalizedName}s: \${error.message}\`);
     }
 };
 
-const create = async (${capitalizedName}, data) => {
+// Crear un nuevo registro
+const create = async (data) => {
     try {
         const newRecord = await ${capitalizedName}.create(data);
-        return await ${capitalizedName}.findByPk(newRecord.id);
+        return await ${capitalizedName}.findByPk(newRecord.id, { ${includeOption} });
     } catch (error) {
         throw new Error(\`Error creating ${capitalizedName}: \${error.message}\`);
     }
 };
 
-const getById = async (${capitalizedName}, id, options = {}) => {
+// Obtener un registro por ID
+const getById = async (id, options = {}) => {
     try {
-        const record = await ${capitalizedName}.findByPk(id, {
-            ...options
+        const record = await ${capitalizedName}.findByPk(id, { 
+            ...options, 
+            ${includeOption} 
         });
         if (!record) {
             throw new Error(\`${capitalizedName} with id \${id} not found\`);
@@ -100,22 +141,22 @@ const getById = async (${capitalizedName}, id, options = {}) => {
     }
 };
 
-const updateById = async (${capitalizedName}, id, data, options = {}) => {
+// Actualizar un registro por ID
+const updateById = async (id, data, options = {}) => {
     try {
         const record = await ${capitalizedName}.findByPk(id);
         if (!record) {
             throw new Error(\`${capitalizedName} with id \${id} not found\`);
         }
         await record.update(data);
-        return await ${capitalizedName}.findByPk(id, {
-            ...options
-        });
+        return await ${capitalizedName}.findByPk(id, { ${includeOption} });
     } catch (error) {
         throw new Error(\`Error updating ${capitalizedName}: \${error.message}\`);
     }
 };
 
-const deleteById = async (${capitalizedName}, id) => {
+// Eliminar un registro por ID
+const deleteById = async (id) => {
     try {
         const record = await ${capitalizedName}.findByPk(id);
         if (!record) {
@@ -128,7 +169,8 @@ const deleteById = async (${capitalizedName}, id) => {
     }
 };
 
-const bulkCreate = async (${capitalizedName}, records) => {
+// Crear múltiples registros en una sola operación
+const bulkCreate = async (records) => {
     try {
         return await ${capitalizedName}.bulkCreate(records, {
             returning: true,
@@ -139,15 +181,39 @@ const bulkCreate = async (${capitalizedName}, records) => {
     }
 };
 
-const findOrCreate = async (${capitalizedName}, where, defaults) => {
+// Buscar un registro o crearlo si no existe
+const findOrCreate = async (where, defaults) => {
     try {
         const [record, created] = await ${capitalizedName}.findOrCreate({
             where,
-            defaults
+            defaults,
+            ${includeOption}
         });
         return { record, created };
     } catch (error) {
         throw new Error(\`Error finding or creating ${capitalizedName}: \${error.message}\`);
+    }
+};
+
+// Contar el total de registros (útil para paginación)
+const count = async (filters = {}) => {
+    try {
+        return await ${capitalizedName}.count({ where: filters });
+    } catch (error) {
+        throw new Error(\`Error counting ${capitalizedName}s: \${error.message}\`);
+    }
+};
+
+// Buscar registros con condiciones específicas
+const findByCondition = async (conditions, options = {}) => {
+    try {
+        return await ${capitalizedName}.findAll({
+            where: conditions,
+            ...options,
+            ${includeOption}
+        });
+    } catch (error) {
+        throw new Error(\`Error finding ${capitalizedName}s: \${error.message}\`);
     }
 };
 
@@ -158,12 +224,16 @@ module.exports = {
     updateById,
     deleteById,
     bulkCreate,
-    findOrCreate
+    findOrCreate,
+    count,
+    findByCondition
 };
 `;
 
     return content;
 };
+
+
 
 const genJsController = (name: string) => {
     const capitalizedName = capitalize(name);
@@ -303,7 +373,7 @@ const genJsController = (name: string) => {
     return content;
 };
 
-const genJsRoutes = (name: string, fields: Field[]) => {
+const genJsRoutes = (name: string, fields: any[]) => {
     const capitalizedName = capitalize(name);
 
     let content = `const express = require('express');\n`;
@@ -338,15 +408,38 @@ const genJsRoutes = (name: string, fields: Field[]) => {
     content += ` *             type: object\n`;
     content += ` *             properties:\n`;
     for (const field of fields) {
-        if (field.name === 'id') continue;
+        if (field.name === 'id') continue; // Ignorar el campo 'id'
+
         content += ` *               ${field.name}:\n`;
-        content += ` *                 type: ${field.type.toLowerCase()}\n`;
+
+        // Determinar el tipo de dato
+        const fieldType = field.type.toLowerCase();
+        if (fieldType.includes('float') || fieldType.includes('decimal') || fieldType.includes('double')) {
+            content += ` *                 type: number\n`;
+            content += ` *                 format: float\n`;
+        } else if (fieldType.includes('integer') || fieldType.includes('int')) {
+            content += ` *                 type: integer\n`;
+            content += ` *                 format: int32\n`;
+        } else if (fieldType.includes('boolean') || fieldType.includes('bool')) {
+            content += ` *                 type: boolean\n`;
+        } else if (fieldType.includes('date') || fieldType.includes('datetime')) {
+            content += ` *                 type: string\n`;
+            content += ` *                 format: date-time\n`;
+        } else {
+            content += ` *                 type: string\n`; // Por defecto, asumimos que es un string
+        }
+
+        // Valor por defecto
         if (field.defaultValue !== undefined) {
             content += ` *                 default: ${JSON.stringify(field.defaultValue)}\n`;
         }
+
+        // Campo requerido
         if (field.allowNull !== undefined) {
             content += ` *                 required: ${!field.allowNull}\n`;
         }
+
+        // Referencias a otros modelos
         if (field.references) {
             content += ` *                 description: References ${field.references.model} on ${field.references.key}\n`;
         }
@@ -391,24 +484,52 @@ const genJsRoutes = (name: string, fields: Field[]) => {
     content += ` *         name: id\n`;
     content += ` *         required: true\n`;
     content += ` *         schema:\n`;
-    content += ` *           type: object\n`;
+    content += ` *           type: integer\n`;
+    content += ` *         description: ID del registro a actualizar.\n`;
+    content += ` *     requestBody:\n`;
+    content += ` *       required: true\n`;
+    content += ` *       content:\n`;
+    content += ` *         application/json:\n`;
+    content += ` *           schema:\n`;
+    content += ` *             type: object\n`;
     content += ` *             properties:\n`;
     for (const field of fields) {
-        if (field.name === 'id') continue;
+        if (field.name === 'id') continue; // Ignorar el campo 'id'
+
         content += ` *               ${field.name}:\n`;
-        content += ` *                 type: ${field.type.toLowerCase()}\n`;
+
+        // Determinar el tipo de dato
+        const fieldType = field.type.toLowerCase();
+        if (fieldType.includes('float') || fieldType.includes('decimal') || fieldType.includes('double')) {
+            content += ` *                 type: number\n`;
+            content += ` *                 format: float\n`;
+        } else if (fieldType.includes('integer') || fieldType.includes('int')) {
+            content += ` *                 type: integer\n`;
+            content += ` *                 format: int32\n`;
+        } else if (fieldType.includes('boolean') || fieldType.includes('bool')) {
+            content += ` *                 type: boolean\n`;
+        } else if (fieldType.includes('date') || fieldType.includes('datetime')) {
+            content += ` *                 type: string\n`;
+            content += ` *                 format: date-time\n`;
+        } else {
+            content += ` *                 type: string\n`; // Por defecto, asumimos que es un string
+        }
+
+        // Valor por defecto
         if (field.defaultValue !== undefined) {
             content += ` *                 default: ${JSON.stringify(field.defaultValue)}\n`;
         }
+
+        // Campo requerido
         if (field.allowNull !== undefined) {
             content += ` *                 required: ${!field.allowNull}\n`;
         }
+
+        // Referencias a otros modelos
         if (field.references) {
             content += ` *                 description: References ${field.references.model} on ${field.references.key}\n`;
         }
     }
-    content += ` *           schema:\n`;
-    content += ` *             $ref: '#/components/schemas/${capitalizedName}'\n`;
     content += ` *     responses:\n`;
     content += ` *       200:\n`;
     content += ` *         description: Registro actualizado exitosamente.\n`;
@@ -451,24 +572,47 @@ const genJsRoutes = (name: string, fields: Field[]) => {
     content += ` *       content:\n`;
     content += ` *         application/json:\n`;
     content += ` *           schema:\n`;
-    content += ` *             type: object\n`;
-    content += ` *             properties:\n`;
+    content += ` *             type: array\n`;
+    content += ` *             items:\n`;
+    content += ` *               type: object\n`;
+    content += ` *               properties:\n`;
     for (const field of fields) {
-        if (field.name === 'id') continue;
-        content += ` *               ${field.name}:\n`;
-        content += ` *                 type: ${field.type.toLowerCase()}\n`;
+        if (field.name === 'id') continue; // Ignorar el campo 'id'
+
+        content += ` *                 ${field.name}:\n`;
+
+        // Determinar el tipo de dato
+        const fieldType = field.type.toLowerCase();
+        if (fieldType.includes('float') || fieldType.includes('decimal') || fieldType.includes('double')) {
+            content += ` *                   type: number\n`;
+            content += ` *                   format: float\n`;
+        } else if (fieldType.includes('integer') || fieldType.includes('int')) {
+            content += ` *                   type: integer\n`;
+            content += ` *                   format: int32\n`;
+        } else if (fieldType.includes('boolean') || fieldType.includes('bool')) {
+            content += ` *                   type: boolean\n`;
+        } else if (fieldType.includes('date') || fieldType.includes('datetime')) {
+            content += ` *                   type: string\n`;
+            content += ` *                   format: date-time\n`;
+        } else {
+            content += ` *                   type: string\n`; // Por defecto, asumimos que es un string
+        }
+
+        // Valor por defecto
         if (field.defaultValue !== undefined) {
-            content += ` *                 default: ${JSON.stringify(field.defaultValue)}\n`;
+            content += ` *                   default: ${JSON.stringify(field.defaultValue)}\n`;
         }
+
+        // Campo requerido
         if (field.allowNull !== undefined) {
-            content += ` *                 required: ${!field.allowNull}\n`;
+            content += ` *                   required: ${!field.allowNull}\n`;
         }
+
+        // Referencias a otros modelos
         if (field.references) {
-            content += ` *                 description: References ${field.references.model} on ${field.references.key}\n`;
+            content += ` *                   description: References ${field.references.model} on ${field.references.key}\n`;
         }
     }
-    content += ` *               defaults:\n`;
-    content += ` *               $ref: '#/components/schemas/${capitalizedName}'\n`;
     content += ` *     responses:\n`;
     content += ` *       201:\n`;
     content += ` *         description: Registros creados exitosamente.\n`;
@@ -490,21 +634,42 @@ const genJsRoutes = (name: string, fields: Field[]) => {
     content += ` *             type: object\n`;
     content += ` *             properties:\n`;
     for (const field of fields) {
-        if (field.name === 'id') continue;
+        if (field.name === 'id') continue; // Ignorar el campo 'id'
+
         content += ` *               ${field.name}:\n`;
-        content += ` *                 type: ${field.type.toLowerCase()}\n`;
+
+        // Determinar el tipo de dato
+        const fieldType = field.type.toLowerCase();
+        if (fieldType.includes('float') || fieldType.includes('decimal') || fieldType.includes('double')) {
+            content += ` *                 type: number\n`;
+            content += ` *                 format: float\n`;
+        } else if (fieldType.includes('integer') || fieldType.includes('int')) {
+            content += ` *                 type: integer\n`;
+            content += ` *                 format: int32\n`;
+        } else if (fieldType.includes('boolean') || fieldType.includes('bool')) {
+            content += ` *                 type: boolean\n`;
+        } else if (fieldType.includes('date') || fieldType.includes('datetime')) {
+            content += ` *                 type: string\n`;
+            content += ` *                 format: date-time\n`;
+        } else {
+            content += ` *                 type: string\n`; // Por defecto, asumimos que es un string
+        }
+
+        // Valor por defecto
         if (field.defaultValue !== undefined) {
             content += ` *                 default: ${JSON.stringify(field.defaultValue)}\n`;
         }
+
+        // Campo requerido
         if (field.allowNull !== undefined) {
             content += ` *                 required: ${!field.allowNull}\n`;
         }
+
+        // Referencias a otros modelos
         if (field.references) {
             content += ` *                 description: References ${field.references.model} on ${field.references.key}\n`;
         }
     }
-    content += ` *               defaults:\n`;
-    content += ` *                 $ref: '#/components/schemas/${capitalizedName}'\n`;
     content += ` *     responses:\n`;
     content += ` *       200:\n`;
     content += ` *         description: Registro encontrado o creado exitosamente.\n`;
@@ -515,6 +680,7 @@ const genJsRoutes = (name: string, fields: Field[]) => {
 
     return content;
 };
+
 const genSequelizeConfig = (projectName: string, config: DbConfig): string => {
     let content = `import { Sequelize } from 'sequelize';\n`;
     content += `import dotenv from 'dotenv';\n\n`;
@@ -621,7 +787,7 @@ const initializeDatabase = async () => {
 
 // API Routes
 ${names.map(name => `app.use('/api/${name}', require('./routes/${name}.routes'));`).join('\n')}
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+
 // Start server
 const PORT = process.env.PORT || 3000;
 const startServer = async () => {
@@ -674,27 +840,28 @@ const genPackageJson = (projectName: string) => {
 `;
 }
 
-const genSwaggerJs = (modelos: any, projectName: string) => {
+const genSwaggerJs = (modelos: any[], projectName: string) => {
     let content = `
-    const swaggerJsdoc = require('swagger-jsdoc');
-    const swaggerUi = require('swagger-ui-express');
+const swaggerJsdoc = require('swagger-jsdoc');
+const swaggerUi = require('swagger-ui-express');
 
-    const options = {
-        definition: {
-            openapi: '3.0.0',
-            info: {
-                title: 'API Documentation',
-                version: '1.0.0',
-                description: 'API documentation for the ${projectName} model',
+const options = {
+    definition: {
+        openapi: '3.0.0',
+        info: {
+            title: 'API Documentation',
+            version: '1.0.0',
+            description: 'API documentation for the ${projectName} model',
+        },
+        servers: [
+            {
+                url: 'http://localhost:3000/api/',
             },
-            servers: [
-                {
-                    url: 'http://localhost:3000/api/',
-                },
-            ],
-            components: {
-                schemas: {
-    `;
+        ],
+        components: {
+            schemas: {
+`;
+
     for (const modelo of modelos) {
         if (!modelo.name || !modelo.fields) {
             console.error(`Modelo inválido: falta 'name' o 'fields'`);
@@ -704,28 +871,67 @@ const genSwaggerJs = (modelos: any, projectName: string) => {
         content += `                ${modelo.name}: {\n`;
         content += `                    type: 'object',\n`;
         content += `                    properties: {\n`;
-    for (const field of modelo.fields) {
-        content += `                        ${field.name}: {\n`;
-        content += `                            type: '${field.type.toLowerCase()}',\n`;
-        content += `                            description: 'A field for ${modelo.name}',\n`;
-        content += `                        },\n`;
+
+        for (const field of modelo.fields) {
+            if (field.name === 'id') continue; // Ignorar el campo 'id'
+
+            content += `                        ${field.name}: {\n`;
+
+            // Mapear tipos de datos a tipos válidos de OpenAPI
+            const fieldType = field.type.toLowerCase();
+            if (fieldType.includes('float') || fieldType.includes('decimal') || fieldType.includes('double')) {
+                content += `                            type: 'number',\n`;
+                content += `                            format: 'float',\n`;
+            } else if (fieldType.includes('integer') || fieldType.includes('int')) {
+                content += `                            type: 'integer',\n`;
+                content += `                            format: 'int32',\n`;
+            } else if (fieldType.includes('boolean') || fieldType.includes('bool')) {
+                content += `                            type: 'boolean',\n`;
+            } else if (fieldType.includes('date') || fieldType.includes('datetime')) {
+                content += `                            type: 'string',\n`;
+                content += `                            format: 'date-time',\n`;
+            } else {
+                content += `                            type: 'string',\n`; // Por defecto, asumimos que es un string
+            }
+
+            // Descripción del campo
+            content += `                            description: 'A field for ${modelo.name}',\n`;
+
+            // Valor por defecto
+            if (field.defaultValue !== undefined) {
+                content += `                            default: ${JSON.stringify(field.defaultValue)},\n`;
+            }
+
+            // Campo requerido
+            if (field.allowNull !== undefined) {
+                content += `                            required: ${!field.allowNull},\n`;
+            }
+
+            // Referencias a otros modelos
+            if (field.references) {
+                content += `                            description: 'References ${field.references.model} on ${field.references.key}',\n`;
+            }
+
+            content += `                        },\n`;
+        }
+
+        content += `                    }\n`;
+        content += `                },\n`;
     }
-    content += `                    }\n`;
-    content += `                },\n`;
-}
-content += `            },\n`;
-content += `        },\n`;
-content += `        apis: ['./src/routes/*.js'],\n`;
-content += `    };\n`;
-content += `    const swaggerDocument = swaggerJsdoc(options);\n`;
-content += `    const swaggerDocs = (app) => {\n`;
-content += `        app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));\n`;
-content += `    };\n`;
-content += `    module.exports = swaggerDocs;\n`;
+
+    content += `            }\n`;
+    content += `        }\n`;
+    content += `    },\n`;
+    content += `    apis: ['./src/routes/*.js'],\n`;
+    content += `};\n\n`;
+    content += `const swaggerDocument = swaggerJsdoc(options);\n\n`;
+    content += `const swaggerDocs = (app) => {\n`;
+    content += `    app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));\n`;
+    content += `};\n\n`;
+    content += `module.exports = swaggerDocs;\n`;
+
     return content;
-}
-
-
+};
 
 
 export default {

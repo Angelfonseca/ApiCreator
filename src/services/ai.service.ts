@@ -76,7 +76,7 @@ const sendToGpt = async (userPrompt: string, db: string): Promise<{ json: any, t
         { role: "user", content: userPrompt },
       ],
       temperature: 0.7,
-      max_tokens: 1000,
+      max_tokens: 1200,
     });
 
     const response = completion?.choices?.[0]?.message?.content;
