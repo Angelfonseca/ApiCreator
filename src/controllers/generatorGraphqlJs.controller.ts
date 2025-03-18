@@ -1,6 +1,5 @@
 import GQLService from '../services/generatorGraphqlJs.service';
 import path from 'path';
-import { createRequire } from 'module';
 import fs from 'fs';
 import archiver from 'archiver';
 import { createWriteStream } from 'fs';
@@ -17,204 +16,236 @@ interface Field {
     fields?: Field[];
 }
 
+interface ProjectConfig {
+    projectName: string;
+    models: {
+        name: string;
+        fields: Field[];
+    }[];
+}
+
+// Helper para asegurar que un directorio exista
 const ensureDirExists = (dir: string) => {
     if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
     }
 };
 
+// Helper para capitalizar strings
 const capitalizeType = (type: string) => {
     return type.charAt(0).toUpperCase() + type.slice(1);
 };
 
-const genDbConection = (name: string, dir: string) => {
+// Generar la conexión a la base de datos
+const genDbConnection = (dbName: string, dir: string) => {
     const outputDir = path.join(dir, 'config');
     ensureDirExists(outputDir);
 
     try {
-        const dbContent = GQLService.generateMongoConnection(name);
+        const dbContent = GQLService.generateMongoConnection(dbName);
         const filePath = path.join(outputDir, 'db.js');
         fs.writeFileSync(filePath, dbContent);
         console.log(`Conexión a la base de datos generada en ${filePath}`);
     } catch (error: any) {
         console.error(`Error al generar la conexión a la base de datos: ${error.message}`);
     }
-}
+};
 
-const genModels = (name: string, dir: string, models: any[]) => {
+// Generar modelos
+const genModels = (dir: string, models: { name: string; fields: Field[] }[]) => {
     const outputDir = path.join(dir, 'models');
     ensureDirExists(outputDir);
-    for (const model of models) {
-        const fields = model.fields;
-        const modelContent = GQLService.generateMongoModels(model.name, fields);
-        const filePath = path.join(outputDir, `${model.name}.model.js`);
-        fs.writeFileSync(filePath, modelContent);
-        console.log(`Modelo ${model.name} generado en ${filePath}`);
-    }
-}
 
+    models.forEach(model => {
+        try {
+            const modelContent = GQLService.generateMongoModels(model.name, model.fields);
+            const filePath = path.join(outputDir, `${model.name}.model.js`);
+            fs.writeFileSync(filePath, modelContent);
+            console.log(`Modelo ${model.name} generado en ${filePath}`);
+        } catch (error: any) {
+            console.error(`Error al generar el modelo ${model.name}: ${error.message}`);
+        }
+    });
+};
+
+// Generar PubSub
 const genPubsub = (dir: string) => {
     const outputDir = path.join(dir);
     ensureDirExists(outputDir);
-    const pubsubContent = GQLService.generatePubsub();
-    const filePath = path.join(outputDir, 'pubsub.js');
-    fs.writeFileSync(filePath, pubsubContent);
-    console.log(`PubSub generado en ${filePath}`);
-}
 
-const createMutations = (name: string, dir: string, modelFields: Field[]) => {
+    try {
+        const pubsubContent = GQLService.generatePubsub();
+        const filePath = path.join(outputDir, 'pubsub.js');
+        fs.writeFileSync(filePath, pubsubContent);
+        console.log(`PubSub generado en ${filePath}`);
+    } catch (error: any) {
+        console.error(`Error al generar PubSub: ${error.message}`);
+    }
+};
+
+// Generar mutaciones
+const createMutations = (name: string, dir: string, fields: Field[]) => {
     const outputDir = path.join(dir, 'mutations');
     ensureDirExists(outputDir);
+
     try {
-        const create = GQLService.generateCreateMutation(name, modelFields);
-        const update = GQLService.generateUpdateMutation(name, modelFields);
+        const create = GQLService.generateCreateMutation(name, fields);
+        const update = GQLService.generateUpdateMutation(name, fields);
         const remove = GQLService.generateDeleteMutation(name);
+
         const createFilePath = path.join(outputDir, `create${capitalizeType(name)}.js`);
         const updateFilePath = path.join(outputDir, `update${capitalizeType(name)}.js`);
         const removeFilePath = path.join(outputDir, `remove${capitalizeType(name)}.js`);
+
         fs.writeFileSync(createFilePath, create);
         fs.writeFileSync(updateFilePath, update);
         fs.writeFileSync(removeFilePath, remove);
+
         console.log(`Mutaciones de ${name} generadas en ${createFilePath}, ${updateFilePath} y ${removeFilePath}`);
     } catch (error: any) {
         console.error(`Error al generar las mutaciones de ${name}: ${error.message}`);
     }
-}
+};
 
-
-const createQueries = (name: string, dir: string, modelFields: Field[]) => {
+// Generar consultas
+const createQueries = (name: string, dir: string, fields: Field[]) => {
     const outputDir = path.join(dir, 'queries');
     ensureDirExists(outputDir);
+
     try {
-        const get = GQLService.generateGetOneQuery(name, modelFields);
-        const getAll = GQLService.generateGetAllQuery(name, modelFields);
+        const get = GQLService.generateGetOneQuery(name, fields);
+        const getAll = GQLService.generateGetAllQuery(name, fields);
+
         const getFilePath = path.join(outputDir, `get${capitalizeType(name)}.js`);
         const getAllFilePath = path.join(outputDir, `getAll${capitalizeType(name)}.js`);
+
         fs.writeFileSync(getFilePath, get);
         fs.writeFileSync(getAllFilePath, getAll);
+
         console.log(`Consultas de ${name} generadas en ${getFilePath} y ${getAllFilePath}`);
     } catch (error: any) {
         console.error(`Error al generar las consultas de ${name}: ${error.message}`);
     }
-}
-const genModuleIndex = (dir: string, fields: Field[], name: string) => {
-    const outputDir = path.join(dir, 'index.js');
+};
+
+// Generar índice de módulo
+const genModuleIndex = (dir: string, name: string, fields: Field[]) => {
     try {
         const moduleIndexContent = GQLService.generateModuleIndex(name, fields);
-        fs.writeFileSync(outputDir, moduleIndexContent);
-        console.log(`Index de módulo ${name} generado en ${outputDir}`);
+        const filePath = path.join(dir, 'index.js');
+        fs.writeFileSync(filePath, moduleIndexContent);
+        console.log(`Índice del módulo ${name} generado en ${filePath}`);
     } catch (error: any) {
-        console.error(`Error al generar el index del módulo ${name}: ${error.message}`);
+        console.error(`Error al generar el índice del módulo ${name}: ${error.message}`);
     }
-}
+};
 
+// Generar un módulo completo
 const genModule = (dir: string, name: string, fields: Field[]) => {
-    try {
-        const outputDir = path.join(dir, 'modules', name);
-        ensureDirExists(outputDir);
-        const queries = createQueries(name, outputDir, fields);
-        const mutations = createMutations(name, outputDir, fields);
-        const moduleIndex = genModuleIndex(outputDir, fields, name);
-        console.log(`Módulo ${name} generado en ${outputDir}`);
-    } catch (error: any) {
-        console.error(`Error al generar el módulo ${name}: ${error.message}`);
-    }
-}
-const genModules = (dir: string, modules: any[]) => {
-    try {
-        if (!modules || !Array.isArray(modules) || modules.length === 0) {
-            throw new Error('No modules provided or invalid modules array');
-        }
-        modules.forEach(module => {
-            genModule(dir, module.name, module.fields);
-        });
-    } catch (error: any) {
-        console.error(`Error al generar los módulos: ${error.message}`);
-    }
-}
+    const outputDir = path.join(dir, 'modules', name);
+    ensureDirExists(outputDir);
 
-const genModulesIndex = (dir: string, names: string[]) => {
+    createQueries(name, outputDir, fields);
+    createMutations(name, outputDir, fields);
+    genModuleIndex(outputDir, name, fields);
+
+    console.log(`Módulo ${name} generado en ${outputDir}`);
+};
+
+// Generar todos los módulos
+const genModules = (dir: string, models: { name: string; fields: Field[] }[]) => {
+    models.forEach(model => {
+        genModule(dir, model.name, model.fields);
+    });
+};
+
+// Generar índice de módulos
+const genModulesIndex = (dir: string, moduleNames: string[]) => {
     const outputDir = path.join(dir, 'modules');
-    try {
-        const moduleIndexContent = GQLService.generateModulesIndex(names);
-        fs.writeFileSync(path.join(outputDir, 'index.js'), moduleIndexContent);
-        console.log(`Index de módulos generado en ${outputDir}`);
-        } catch (error: any) {
-            console.error(`Error al generar el index de módulos: ${error.message}`);
-        }
-}
+    ensureDirExists(outputDir);
 
-const genIndex = (dir: string, m: string) => {
-    const outputDir = path.join(dir);
+    try {
+        const moduleIndexContent = GQLService.generateModulesIndex(moduleNames);
+        const filePath = path.join(outputDir, 'index.js');
+        fs.writeFileSync(filePath, moduleIndexContent);
+        console.log(`Índice de módulos generado en ${filePath}`);
+    } catch (error: any) {
+        console.error(`Error al generar el índice de módulos: ${error.message}`);
+    }
+};
+
+// Generar archivo principal (index.js)
+const genIndex = (dir: string) => {
     try {
         const indexContent = GQLService.generateIndexGraphqlJs();
-        fs.writeFileSync(path.join(outputDir, 'index.js'), indexContent);
-        console.log(`Index generado en ${outputDir}`);
+        const filePath = path.join(dir, 'index.js');
+        fs.writeFileSync(filePath, indexContent);
+        console.log(`Archivo index.js generado en ${filePath}`);
+    } catch (error: any) {
+        console.error(`Error al generar el archivo index.js: ${error.message}`);
     }
-    catch (error: any) {
-        console.error(`Error al generar el index: ${error.message}`);
-    }
-}
+};
 
+// Generar package.json
 const genPackageJson = (projectName: string, dir: string) => {
     try {
         const packageJson = GQLService.generatePackageJson(projectName);
-        fs.writeFileSync(path.join(dir, 'package.json') , packageJson);
-        console.log(`Package.json generado en ${dir}`);
+        const filePath = path.join(dir, 'package.json');
+        fs.writeFileSync(filePath, packageJson);
+        console.log(`package.json generado en ${filePath}`);
     } catch (error: any) {
         console.error(`Error al generar el package.json: ${error.message}`);
     }
-}
+};
 
-const generateScalartypes = (dir: string) => {
+// Generar scalar types
+const genScalarTypes = (dir: string) => {
     try {
-        const outputDir = path.join(dir, 'modules');
-        const scalartypes = GQLService.generateScalartypes();
-        fs.writeFileSync(path.join(outputDir, 'scalars.js'), scalartypes);
-        console.log(`Scalar types generado en ${dir}`);
-        } catch (error: any) {
-            console.error(`Error al generar los scalar types: ${error.message}`);
-        }
-}
+        const scalarsContent = GQLService.generateScalartypes();
+        const filePath = path.join(dir, 'scalars.js');
+        fs.writeFileSync(filePath, scalarsContent);
+        console.log(`Scalar types generados en ${filePath}`);
+    } catch (error: any) {
+        console.error(`Error al generar los scalar types: ${error.message}`);
+    }
+};
 
-
+// Crear el proyecto completo
 const createProject = async (req: Request, res: Response) => {
-    const projectName = req.body.projectName;
-    const models = req.body.models;
+    const { projectName, models } = req.body as ProjectConfig;
     const outputBaseDir = path.join(__dirname, '..', '..', '..', 'outputs');
     const projectDir = path.join(outputBaseDir, projectName);
-    console.log('Creating project...');
+    const srcDir = path.join(projectDir, 'src');
+
     ensureDirExists(outputBaseDir);
+    ensureDirExists(projectDir);
+    ensureDirExists(srcDir);
 
     try {
-        // Create project files
-        const srcDir = path.join(projectDir, 'src');
-        ensureDirExists(srcDir);
-        genIndex(srcDir, projectName);
-        genModules(srcDir, models);
-        genModulesIndex(srcDir, models.map((m: { name: string }) => m.name));
-        genModels(projectName, srcDir, models);
-        genDbConection(projectName, srcDir);
+        // Generar estructura del proyecto
+        genDbConnection(projectName, srcDir);
+        genModels(srcDir, models);
         genPubsub(srcDir);
-        generateScalartypes(srcDir);
-        genIndex(srcDir, projectName);
-
+        genScalarTypes(srcDir);
+        genModules(srcDir, models);
+        genModulesIndex(srcDir, models.map(model => model.name));
+        genIndex(srcDir);
         genPackageJson(projectName, projectDir);
 
-        // Create zip file
+        // Crear archivo ZIP
         const zipPath = path.join(outputBaseDir, `${projectName}.zip`);
         const output = createWriteStream(zipPath);
         const archive = archiver('zip', { zlib: { level: 9 } });
 
         output.on('close', () => {
-            // Delete the project directory after zipping
+            // Eliminar el directorio del proyecto después de comprimir
             fs.rmSync(projectDir, { recursive: true, force: true });
-            console.log(`Project ${projectName} created and zipped successfully`);
+            console.log(`Proyecto ${projectName} creado y comprimido exitosamente`);
             res.download(zipPath, `${projectName}.zip`, (err) => {
                 if (err) {
-                    console.error(`Error sending zip file: ${err.message}`);
+                    console.error(`Error enviando el archivo ZIP: ${err.message}`);
                 }
-                // Delete the zip file after sending
+                // Eliminar el archivo ZIP después de enviarlo
                 fs.unlinkSync(zipPath);
             });
         });
@@ -224,12 +255,11 @@ const createProject = async (req: Request, res: Response) => {
         await archive.finalize();
 
     } catch (error: any) {
-        console.error(`Error creating project: ${error.message}`);
-        res.status(500).send({ message: `Error creating project: ${error.message}` });
+        console.error(`Error creando el proyecto: ${error.message}`);
+        res.status(500).send({ message: `Error creando el proyecto: ${error.message}` });
     }
-}
+};
 
 export default {
     createProject
 };
-

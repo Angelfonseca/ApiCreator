@@ -16,7 +16,7 @@ const generateMongoConnection = (DbName: string) => {
     const dataBase = process.env.DB_NAME || '${DbName}';
     async function connectToDb() {
         try {
-            await mongoose.connect('mongodb://localhost:27017/' + dataBase, {);
+            await mongoose.connect('mongodb://localhost:27017/' + dataBase);
             console.log('Connected to MongoDB');
         } catch (error) {
             console.error('Error connecting to MongoDB: ', error);
@@ -50,13 +50,28 @@ const generateMongoModels = (name: string, fields: Field[]) => {
         }
 
         // Handle basic fields
+        let validateString = '';
+        if (field.validate) {
+            if (field.validate.isIn) {
+                // Convert isIn to a custom validator
+                validateString = `validate: {
+                    validator: function (v) {
+                        return ${JSON.stringify(field.validate.isIn)}.includes(v);
+                    },
+                    message: props => \`\${props.value} no es un valor válido. Los valores permitidos son: ${JSON.stringify(field.validate.isIn)}.\`
+                },`;
+            } else {
+                validateString = `validate: ${JSON.stringify(field.validate)},`;
+            }
+        }
+
         return `
         ${field.name}: {
-            type: ${field.type},
+            type: ${field.type === 'Array' ? '[]' : field.type},
             ${field.allowNull ? 'required: false' : 'required: true'},
             ${field.defaultValue ? `default: ${field.defaultValue},` : ''}
             ${field.unique ? 'unique: true,' : ''}
-            ${field.validate ? `validate: ${JSON.stringify(field.validate)},` : ''}
+            ${validateString}
             ${field.references ? `ref: '${field.references.model}'` : ''}
         }`;
     };
@@ -83,6 +98,7 @@ const generatePubsub = () => {
     export const pubsub = new PubSub();
     `;
 }
+
 const generateMutationArguments = (fields: Field[]): string => {
     let mutationArgs = '';
     for (let field of fields) {
@@ -90,6 +106,7 @@ const generateMutationArguments = (fields: Field[]): string => {
     }
     return mutationArgs;
 }
+
 const generateCreateMutation = (name: string, fields: Field[]) => {
     let mutationArgs = generateMutationArguments(fields);
     return `
@@ -137,13 +154,13 @@ const generateUpdateMutation = (name: string, fields: Field[]) => {
     export default update${name};
     `;
 };
-// Verifica si hay referencias en los campos, incluso en estructuras anidadas
+
+
 const hasReferences = (fields: Field[]): boolean =>
     fields.some(field =>
         field.references || (field.fields && hasReferences(field.fields))
     );
 
-// Obtiene los campos que necesitan `populate`
 const getPopulateFields = (fields: Field[], prefix = ''): string[] => {
     return fields.flatMap(field => {
         const fieldPath = prefix ? `${prefix}.${field.name}` : field.name;
@@ -160,7 +177,6 @@ const getPopulateFields = (fields: Field[], prefix = ''): string[] => {
     });
 };
 
-// Obtiene los modelos referenciados
 const getReferencedModels = (fields: Field[]): Set<string> =>
     fields.reduce((models, field) => {
         if (field.references) {
@@ -172,7 +188,6 @@ const getReferencedModels = (fields: Field[]): Set<string> =>
         return models;
     }, new Set<string>());
 
-// Genera consultas dinámicas con `populate`
 const generateGetOneQuery = (name: string, fields: Field[]) => {
     const populateFields = getPopulateFields(fields);
     const populateString = populateFields.length ? `.populate('${populateFields.join(" ")}')` : '';
@@ -214,53 +229,86 @@ export default getAll${name}s;`;
 };
 
 const generateModuleIndex = (name: string, fields: Field[]) => {
-    const mutationArgs = generateMutationArguments(fields);
-    let moduleIndex = `
-    import {gql} from 'apollo-server-express';
-    import pkg from 'graphql-subscriptions';
-    import {pubsub} from '../../pubsub.js';
+    // Helper function to map MongoDB types to GraphQL types
+    const mapTypeToGraphQL = (field: Field): string => {
+        switch (field.type) {
+            case 'String': return 'String';
+            case 'Number': return 'Float';
+            case 'Boolean': return 'Boolean';
+            case 'Date': return 'Date';
+            case 'ObjectId': return 'ID';
+            case 'Mixed': return 'JSON';
+            case 'Array':
+                if (field.fields && field.fields.length > 0) {
+                    // If it's an array of objects or references
+                    return `[${mapTypeToGraphQL(field.fields[0])}]`;
+                } else {
+                    // Default to String array if no fields specified
+                    return '[String]';
+                }
+            default: return field.references ? field.references.model : 'String';
+        }
+    };
+
+    const typeDefs = `
+    type ${name} {
+        id: ID!
+        ${fields.map(field => {
+            if (field.type === 'Array' && field.fields) {
+                // Array of objects/references
+                const innerType = mapTypeToGraphQL(field.fields[0]);
+                return `${field.name}: [${innerType}]`;
+            } else if (field.fields) {
+                // Nested object
+                return `${field.name}: ${field.references?.model || 'Object'}`;
+            } else {
+                // Basic field
+                const graphqlType = mapTypeToGraphQL(field);
+                return `${field.name}: ${field.allowNull ? graphqlType : graphqlType + '!'}`;
+            }
+        }).join('\n')}
+    }
+
+    type Query {
+        get${name}(id: ID!): ${name}
+        getAll${name}s: [${name}]
+    }
+
+    type Mutation {
+        create${name}(${fields.map(field => {
+            const graphqlType = mapTypeToGraphQL(field);
+            return `${field.name}: ${field.allowNull ? graphqlType : graphqlType + '!'}`;
+        }).join(', ')}): ${name}
+        delete${name}(id: ID!): ${name}
+        update${name}(id: ID!, ${fields.map(field => {
+            const graphqlType = mapTypeToGraphQL(field);
+            return `${field.name}: ${graphqlType}`;
+        }).join(', ')}): ${name}
+    }
+
+    type Subscription {
+        ${name}Created: ${name}
+        ${name}Deleted: ${name}
+        ${name}Updated: ${name}
+    }
+    `;
+
+    return `
+    import { gql } from 'apollo-server-express';
+    import { withFilter } from 'graphql-subscriptions';
+    import { pubsub } from '../../pubsub.js';
     import create${name} from './mutations/create${name}.js';
     import delete${name} from './mutations/remove${name}.js';
     import update${name} from './mutations/update${name}.js';
     import get${name} from './queries/get${name}.js';
-    import getAll${name} from './queries/getAll${name}.js';
+    import getAll${name}s from './queries/getAll${name}.js';
 
-    const { withFilter } = pkg;
+    export const typeDefs = gql\`${typeDefs}\`;
 
-    const typeDefs = gql\`
-        type ${name} {
-            ${fields.map(field => `${field.name}: ${field.type}`).join('\n')}
-        }
-
-        type Query {
-            get${name}(id: ID!): ${name}
-            getAll${name}: [${name}]
-        }
-
-        type Mutation {
-            create${name}: ${name}
-            delete${name}(id: ID!): ${name}
-            update${name}(id: ID!): ${name}
-        }
-
-        type Subscription {
-            ${name}Created: ${name}
-            ${name}Deleted: ${name}
-            ${name}Updated: ${name}
-        }
-    \`;
-
-    function filter${name}Created(payload) {
-        return true;
-    }
-    function filter${name}Updated(payload) {
-        return true;
-    }
-    
-    const resolvers = {
+    export const resolvers = {
         Query: {
             get${name},
-            getAll${name}
+            getAll${name}s
         },
         Mutation: {
             create${name},
@@ -269,71 +317,55 @@ const generateModuleIndex = (name: string, fields: Field[]) => {
         },
         Subscription: {
             ${name}Created: {
-                subscribe: withFilter(
-                    () => pubsub.asyncIterator('${name}_CREATED'),
-                    (payload, variables) => {
-                        return payload.${name}Created.id === variables.id;
-                    }
-                )
+                subscribe: () => pubsub.asyncIterator('${name}_CREATED')
             },
             ${name}Deleted: {
-                subscribe: withFilter(
-                    () => pubsub.asyncIterator('${name}_DELETED'),
-                    (payload, variables) => {
-                        return payload.${name}Deleted.id === variables.id;
-                    }
-                )
+                subscribe: () => pubsub.asyncIterator('${name}_DELETED')
             },
             ${name}Updated: {
-                subscribe: withFilter(
-                    () => pubsub.asyncIterator('${name}_UPDATED'),
-                    (payload, variables) => {
-                        return payload.${name}Updated.id === variables.id;
-                    }
-                )
+                subscribe: () => pubsub.asyncIterator('${name}_UPDATED')
             }
         }
     };
-
-    export { typeDefs, resolvers };
     `;
-    return moduleIndex;
 }
 
 const generateModulesIndex = (modules: string[]) => {
     const imports = modules.map(module => `import { typeDefs as ${module}TypeDefs, resolvers as ${module}Resolvers } from './${module}/index.js';`);
-    let modulesIndex = `
+    return `
     import { gql } from 'apollo-server-express';
-    import { GraphQLScalarType } from 'graphql';
-    import { makeExecutableSchema } from 'graphql-tools';
-    import { DateScalar, ObjectIdScalar, NumberScalar, timeScalar } from './scalars.js';
+    import { makeExecutableSchema } from '@graphql-tools/schema';
+    import { DateScalar, ObjectIdScalar, NumberScalar, timeScalar, JSONScalar } from '../scalars.js';
 
     ${imports.join('\n')}
-
 
     const typeDefs = gql\`
         scalar Date
         scalar ObjectId
+        scalar JSON
         scalar Number
         scalar Time
+        
         type Query {
             getVersions: String!
         }
         type Mutation {
             getVersion: String!
-}
+        }
     \`;
+
     const resolvers = {
-    Date: DateScalar,
-    ObjectId: ObjectIdScalar,
-    Number: NumberScalar,
-    Time: timeScalar,
-    Query: {
-        getVersions: () => 'v1',
-    },
-    Mutation: {
-        getVersion: () => 'v1',
-    },
+        Date: DateScalar,
+        ObjectId: ObjectIdScalar,
+        Number: NumberScalar,
+        Time: timeScalar,
+        JSON: JSONScalar,
+        Query: {
+            getVersions: () => 'v1',
+        },
+        Mutation: {
+            getVersion: () => 'v1',
+        },
     };
 
     const schema = makeExecutableSchema({
@@ -343,17 +375,15 @@ const generateModulesIndex = (modules: string[]) => {
 
     export default schema;
     `;
-
-    return modulesIndex;
 }
 
 const generateIndexGraphqlJs = () => {
-    let index = `
+    return `
     import { ApolloServer } from 'apollo-server-express';
     import express from 'express';
     import connectToDb from './config/db.js';
     import schema from './modules/index.js';
-    import {WebSocketServer} from 'ws';
+    import { WebSocketServer } from 'ws';
     import http from 'http';
     import bodyParser from 'body-parser';
     import dotenv from 'dotenv';
@@ -370,26 +400,19 @@ const generateIndexGraphqlJs = () => {
         res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
         res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE');
         next();
-    }
-    );
+    });
     app.disable('x-powered-by');
 
     app.use(bodyParser.json({ limit: '50mb' }));
-    app.use(
-    bodyParser.urlencoded({
-        limit: "50mb",
-        extended: true,
-        parameterLimit: 50000,
-    })
-);
+    app.use(bodyParser.urlencoded({ limit: '50mb', extended: true, parameterLimit: 50000 }));
+
     const PORT = process.env.PORT || 4000;
     const server = new ApolloServer({ 
-    cache: "bounded",
-    schema,
-    context: ({ req, res }) => ({ req, res }),
-    plugins: [
-        {
-            ApolloServerPluginDrainHttpServer: {
+        cache: 'bounded',
+        schema,
+        context: ({ req, res }) => ({ req, res }),
+        plugins: [
+            {
                 async serverWillStart() {
                     return {
                         async drainServer() {
@@ -398,9 +421,8 @@ const generateIndexGraphqlJs = () => {
                     };
                 }
             }
-        }
-    ]
-});
+        ]
+    });
 
     const wss = new WebSocketServer({ server: httpServer });
 
@@ -417,13 +439,11 @@ const generateIndexGraphqlJs = () => {
        
         httpServer.listen(PORT, () => {
             console.log(\`🚀 Server ready at http://localhost:\${PORT}\${server.graphqlPath}\`);
-            console.log(\`🚀 Subscriptions ready at ws://localhost:\${PORT}\` );
+            console.log(\`🚀 Subscriptions ready at ws://localhost:\${PORT}\`);
         });
     }
     connectToDb().then(startApolloServer);
-
     `;
-    return index;
 }
 
 const generatePackageJson = (projectName: string) => {
@@ -447,7 +467,7 @@ const generatePackageJson = (projectName: string) => {
             "express": "^4.17.1",
             "graphql": "^15.3.1",
             "graphql-subscriptions": "^1.2.0",
-            "graphql-tools": "^8.2.0",
+            "@graphql-tools/schema": "^8.3.0",
             "mongoose": "^6.0.11",
             "nodemon": "^2.0.15",
             "ws": "^8.6.0",
@@ -514,19 +534,35 @@ const generateScalartypes = () => {
             return null;
         },
     });
+
     const timeScalar = new GraphQLScalarType({
-    name: 'Time',
-    description: 'Time custom scalar type',
-    serialize(value) {
-        return value;
-    },
+        name: 'Time',
+        description: 'Time custom scalar type',
+        serialize(value) {
+            return value;
+        },
     });
 
-    export { DateScalar, ObjectIdScalar, NumberScalar, timeScalar };
-        `;
+    const JSONScalar = new GraphQLScalarType({
+        name: 'JSON',
+        description: 'JSON custom scalar type',
+        parseValue(value) {
+            return typeof value === 'string' ? JSON.parse(value) : value;
+        },
+        serialize(value) {
+            return typeof value === 'object' ? value : JSON.parse(value);
+        },
+        parseLiteral(ast) {
+            if (ast.kind === Kind.STRING) {
+                return JSON.parse(ast.value);
+            }
+            return null;
+        },
+    });
+
+    export { DateScalar, ObjectIdScalar, NumberScalar, timeScalar, JSONScalar };
+    `;
 }
-
-
 
 export default {
     generateMongoConnection,
@@ -543,4 +579,3 @@ export default {
     generatePackageJson,
     generateScalartypes
 };
-

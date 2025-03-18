@@ -229,6 +229,7 @@ const createProject = async (req: Request, res: Response): Promise<void> => {
     } catch (error) {
         console.error('Error durante la creación del proyecto:', error);
         res.status(500).send('Error al crear el proyecto');
+        throw new Error('Error al crear el proyecto');
     }
 };
 

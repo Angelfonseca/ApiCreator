@@ -3,6 +3,7 @@ import generatorJSController from "../controllers/generatorJS.controller";
 import generatorPGJSController from "../controllers/generatorPostgresJS.controller";
 import generatorPGTSController from "../controllers/generatorPostgresTs.controller";
 import generatorGraphqlJsController from "../controllers/generatorGraphqlJs.controller";
+import generatorGraphqlTsController from "../controllers/generatorGqlTs.controller";
 import aiController from "../services/ai.service";
 import { Router } from "express";
 
@@ -13,6 +14,8 @@ router.post('/generatemdbjs', generatorJSController.createJSProject);
 router.post('/generatepgjs', generatorPGJSController.createPgProject);
 router.post('/generatepgts', generatorPGTSController.createPgTSProject);
 router.post('/generategqljs', generatorGraphqlJsController.createProject);
+router.post('/generategqlts', generatorGraphqlTsController.createProject);
+
 router.post('/ai', aiController.controller);
 
 export default router;

@@ -11,6 +11,7 @@ app.use(bodyParser.json());
 app.set('view engine', 'ejs');
 
 app.set('views', path.join(__dirname, '../views')); 
+console.log('Views directory:', path.resolve(__dirname, '..', 'views'));
 
 app.get('/', (req, res) => {
   res.render('welcome');
